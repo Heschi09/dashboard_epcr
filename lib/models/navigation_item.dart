@@ -1,0 +1,1 @@
+enum NavigationItem { dashboard, pcr, crew, vehicles, equipment }
