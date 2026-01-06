@@ -5,10 +5,14 @@ class FormDialog extends StatefulWidget {
     super.key,
     required this.title,
     required this.fields,
+    this.onSubmit,
+    this.initialValues,
   });
 
   final String title;
   final List<Map<String, String>> fields;
+  final void Function(Map<String, String>)? onSubmit;
+  final Map<String, String>? initialValues;
 
   @override
   State<FormDialog> createState() => _FormDialogState();
@@ -21,8 +25,10 @@ class _FormDialogState extends State<FormDialog> {
   @override
   void initState() {
     super.initState();
-    for (var _ in widget.fields) {
-      _controllers.add(TextEditingController());
+    for (var field in widget.fields) {
+      final key = field['key'] ?? field['label'] ?? 'field';
+      final initial = widget.initialValues?[key] ?? '';
+      _controllers.add(TextEditingController(text: initial));
     }
   }
 
@@ -36,6 +42,10 @@ class _FormDialogState extends State<FormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    String _keyForField(Map<String, String> field) {
+      return field['key'] ?? field['label'] ?? 'field';
+    }
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -75,6 +85,12 @@ class _FormDialogState extends State<FormDialog> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Required';
+                      }
+                      return null;
+                    },
                   ),
                 );
               }),
@@ -90,8 +106,13 @@ class _FormDialogState extends State<FormDialog> {
                   ElevatedButton(
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
-                        // TODO: Save form data
-                        Navigator.of(context).pop();
+                        final data = <String, String>{};
+                        for (var i = 0; i < widget.fields.length; i++) {
+                          final field = widget.fields[i];
+                          data[_keyForField(field)] = _controllers[i].text.trim();
+                        }
+                        widget.onSubmit?.call(data);
+                        Navigator.of(context).pop(data);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('${widget.title} saved')),
                         );

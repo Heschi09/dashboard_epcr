@@ -5,15 +5,18 @@ class SimpleTable extends StatelessWidget {
     super.key,
     required this.headers,
     required this.rows,
+    this.trailingBuilder,
   });
 
   final List<String> headers;
   final List<List<String>> rows;
+  final Widget Function(int rowIndex)? trailingBuilder;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveHeaders = trailingBuilder != null ? [...headers, ''] : headers;
     final columnWidths = <int, TableColumnWidth>{
-      for (var i = 0; i < headers.length; i++) i: const FlexColumnWidth(),
+      for (var i = 0; i < effectiveHeaders.length; i++) i: const FlexColumnWidth(),
     };
 
     return Table(
@@ -24,7 +27,7 @@ class SimpleTable extends StatelessWidget {
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
         TableRow(
-          children: headers
+          children: effectiveHeaders
               .map(
                 (header) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -40,19 +43,24 @@ class SimpleTable extends StatelessWidget {
           )
               .toList(),
         ),
-        ...rows.map(
-              (row) => TableRow(
-            children: row
-                .map(
-                  (cell) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text(
-                  cell,
-                  style: const TextStyle(fontSize: 13),
+        ...rows.asMap().entries.map(
+              (entry) => TableRow(
+            children: [
+              ...entry.value.map(
+                    (cell) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    cell,
+                    style: const TextStyle(fontSize: 13),
+                  ),
                 ),
               ),
-            )
-                .toList(),
+              if (trailingBuilder != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: trailingBuilder!(entry.key),
+                ),
+            ],
           ),
         ),
       ],

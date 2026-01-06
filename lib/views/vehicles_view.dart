@@ -6,9 +6,13 @@ class VehiclesView extends StatelessWidget {
   const VehiclesView({
     super.key,
     required this.vehicles,
+    required this.onDelete,
+    required this.onEdit,
   });
 
   final List<Map<String, String>> vehicles;
+  final ValueChanged<int> onDelete;
+  final ValueChanged<int> onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +28,21 @@ class VehiclesView extends StatelessWidget {
             item['plate']!,
             item['status']!,
           ]).toList(),
+          trailingBuilder: (index) => Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                onPressed: () => onEdit(index),
+                tooltip: 'Edit',
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                onPressed: () => onDelete(index),
+                tooltip: 'Delete',
+              ),
+            ],
+          ),
         ),
       ),
     );

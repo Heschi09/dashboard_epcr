@@ -12,6 +12,7 @@ class DashboardView extends StatelessWidget {
     required this.onClosedTap,
     required this.onNewCrewTap,
     required this.onNewVehicleTap,
+    required this.onNewEquipmentTap,
     required this.onNewOrderTap,
     required this.newOrders,
   });
@@ -21,6 +22,7 @@ class DashboardView extends StatelessWidget {
   final VoidCallback onClosedTap;
   final VoidCallback onNewCrewTap;
   final VoidCallback onNewVehicleTap;
+  final VoidCallback onNewEquipmentTap;
   final VoidCallback onNewOrderTap;
   final List<Map<String, String>> newOrders;
 
@@ -105,6 +107,11 @@ class DashboardView extends StatelessWidget {
                 icon: Icons.local_shipping_outlined,
                 label: 'Register new vehicle',
                 onTap: onNewVehicleTap,
+              ),
+              QuickActionChip(
+                icon: Icons.medical_services_outlined,
+                label: 'Register equipment',
+                onTap: onNewEquipmentTap,
               ),
               QuickActionChip(
                 icon: Icons.assignment_add,

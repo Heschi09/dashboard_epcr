@@ -6,9 +6,13 @@ class EquipmentView extends StatelessWidget {
   const EquipmentView({
     super.key,
     required this.equipment,
+    required this.onDelete,
+    required this.onEdit,
   });
 
   final List<Map<String, String>> equipment;
+  final ValueChanged<int> onDelete;
+  final ValueChanged<int> onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +28,21 @@ class EquipmentView extends StatelessWidget {
             item['qty']!,
             item['target']!,
           ]).toList(),
+          trailingBuilder: (index) => Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                onPressed: () => onEdit(index),
+                tooltip: 'Edit',
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                onPressed: () => onDelete(index),
+                tooltip: 'Delete',
+              ),
+            ],
+          ),
         ),
       ),
     );
