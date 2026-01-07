@@ -45,4 +45,139 @@ class MockData {
     {'patient': 'Jane Rose', 'date': '2025-04-28', 'vehicle': 'Amb-04', 'crew': 'Kamanzi / Weber'},
     {'patient': 'Jacob Lee', 'date': '2025-04-27', 'vehicle': 'Amb-02', 'crew': 'Uwase / Herzig'},
   ];
+
+  static final pcrEncounters = [
+    {
+      'id': 'PCR-001',
+      'patient': {
+        'name': 'John Doe',
+        'age': '45',
+        'sex': 'Male',
+        'birthDate': '1979-05-15',
+      },
+      'encounter': {
+        'status': 'finished',
+        'startTime': '2025-04-28T09:15:00',
+        'endTime': '2025-04-28T10:30:00',
+        'vehicle': 'Ambu-01',
+        'licensePlate': 'RW-512',
+        'driver': 'Samuel Kamanzi',
+        'medic': 'Amelie Bosco',
+        'physician': 'Thomas Müller',
+      },
+      'pcr': {
+        'a': {
+          'airway': 'Clear',
+          'furtherEvaluation': 'No obstructions observed',
+        },
+        'b': {
+          'breathing': 'Normal',
+          'spo2': '98%',
+          'respiratoryRate': '16/min',
+          'furtherEvaluation': 'Regular breathing pattern',
+        },
+        'c': {
+          'pulse': '72 bpm',
+          'bloodPressure': '120/80',
+          'capillaryRefill': '< 2s',
+          'skinAppearance': 'Normal',
+          'hemorrhage': 'None',
+          'furtherEvaluation': 'Stable circulation',
+        },
+        'd': {
+          'eyeOpening': '4 - Spontaneous',
+          'verbalResponse': '5 - Oriented',
+          'motorResponse': '6 - Obeys commands',
+          'pupils': 'Equal and reactive',
+          'gcs': '15',
+          'furtherEvaluation': 'Alert and oriented',
+        },
+        'e': {
+          'wounds': 'None',
+          'burns': 'None',
+          'furtherEvaluation': 'No visible injuries',
+        },
+      },
+      'medications': [
+        {'name': 'Paracetamol', 'dose': '500mg', 'route': 'Oral', 'time': '09:30'},
+      ],
+      'procedures': [
+        {'name': 'IV Access', 'time': '09:20', 'location': 'Left forearm'},
+        {'name': 'ECG Monitoring', 'time': '09:25'},
+      ],
+      'equipmentUsed': [
+        {'name': 'IV Catheter', 'quantity': '1'},
+        {'name': 'ECG Monitor', 'quantity': '1'},
+      ],
+      'handover': {
+        'destination': 'Kigali Hospital',
+        'handedOverTo': 'Dr. Smith',
+        'condition': 'Stable',
+        'notes': 'Patient stable, vitals normal',
+      },
+    },
+    {
+      'id': 'PCR-002',
+      'patient': {
+        'name': 'Jane Rose',
+        'age': '32',
+        'sex': 'Female',
+        'birthDate': '1992-08-22',
+      },
+      'encounter': {
+        'status': 'in-progress',
+        'startTime': '2025-04-28T11:00:00',
+        'vehicle': 'Ambu-04',
+        'licensePlate': 'RW-445',
+        'driver': 'Sarah Weber',
+        'medic': 'Mara Uwase',
+        'physician': 'Manfred Herzig',
+      },
+      'pcr': {
+        'a': {
+          'airway': 'Maintained',
+          'furtherEvaluation': 'Oxygen mask applied',
+        },
+        'b': {
+          'breathing': 'Labored',
+          'spo2': '92%',
+          'respiratoryRate': '22/min',
+          'furtherEvaluation': 'Requires oxygen support',
+        },
+        'c': {
+          'pulse': '110 bpm',
+          'bloodPressure': '140/90',
+          'capillaryRefill': '2-3s',
+          'skinAppearance': 'Pale',
+          'hemorrhage': 'Minor',
+          'furtherEvaluation': 'Tachycardic, monitoring required',
+        },
+        'd': {
+          'eyeOpening': '3 - To voice',
+          'verbalResponse': '4 - Confused',
+          'motorResponse': '5 - Localizes pain',
+          'pupils': 'Equal and reactive',
+          'gcs': '12',
+          'furtherEvaluation': 'Altered mental status',
+        },
+        'e': {
+          'wounds': 'Laceration right arm',
+          'burns': 'None',
+          'furtherEvaluation': 'Wound cleaned and dressed',
+        },
+      },
+      'medications': [
+        {'name': 'Morphine', 'dose': '5mg', 'route': 'IV', 'time': '11:15'},
+      ],
+      'procedures': [
+        {'name': 'Wound Cleaning', 'time': '11:10'},
+        {'name': 'Oxygen Administration', 'time': '11:05'},
+      ],
+      'equipmentUsed': [
+        {'name': 'Oxygen Mask', 'quantity': '1'},
+        {'name': 'IV Catheter', 'quantity': '1'},
+      ],
+      'handover': null,
+    },
+  ];
 }
