@@ -7,6 +7,13 @@ import '../widgets/quick_action_chip.dart';
 class DashboardView extends StatelessWidget {
   const DashboardView({
     super.key,
+    required this.alerts,
+    required this.openOrders,
+    required this.closedOrders,
+    required this.onEditAlert,
+    required this.onAcceptAlert,
+    required this.onEditOpenOrder,
+    required this.onAcceptOpenOrder,
     required this.onAlertsTap,
     required this.onOpenTap,
     required this.onClosedTap,
@@ -17,6 +24,13 @@ class DashboardView extends StatelessWidget {
     required this.newOrders,
   });
 
+  final List<Map<String, String>> alerts;
+  final List<Map<String, String>> openOrders;
+  final List<Map<String, String>> closedOrders;
+  final ValueChanged<int> onEditAlert;
+  final ValueChanged<int> onAcceptAlert;
+  final ValueChanged<int> onEditOpenOrder;
+  final ValueChanged<int> onAcceptOpenOrder;
   final VoidCallback onAlertsTap;
   final VoidCallback onOpenTap;
   final VoidCallback onClosedTap;
@@ -30,12 +44,28 @@ class DashboardView extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      child: Wrap(
-        spacing: 24,
-        runSpacing: 24,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSummaryCard(context),
-          _buildAverageHandlingCard(),
+          const SizedBox(height: 24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildAlertsCard(context)),
+              const SizedBox(width: 24),
+              Expanded(child: _buildOpenOrdersCard(context)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildClosedOrdersCard(context)),
+              const SizedBox(width: 24),
+              Expanded(child: _buildAverageHandlingCard()),
+            ],
+          ),
         ],
       ),
     );
@@ -54,17 +84,17 @@ class DashboardView extends StatelessWidget {
             children: [
               StatChip(
                 label: 'Alerts',
-                value: '18',
+                value: '${alerts.length}',
                 onTap: onAlertsTap,
               ),
               StatChip(
                 label: 'Open',
-                value: '5',
+                value: '${openOrders.length}',
                 onTap: onOpenTap,
               ),
               StatChip(
                 label: 'Closed',
-                value: '13',
+                value: '${closedOrders.length}',
                 onTap: onClosedTap,
               ),
               const StatChip(
@@ -125,10 +155,151 @@ class DashboardView extends StatelessWidget {
     );
   }
 
+  Widget _buildAlertsCard(BuildContext context) {
+    return DashboardCard(
+      title: 'Alerts',
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (alerts.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('No alerts', style: TextStyle(color: Color(0xFF8B909A))),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300),
+              child: Scrollbar(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: alerts.length,
+                  itemBuilder: (context, index) {
+                    final alert = alerts[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        title: Text(alert['message'] ?? ''),
+                        subtitle: Text('${alert['time']} - ${alert['type']}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              onPressed: () => onEditAlert(index),
+                              tooltip: 'Edit',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.check_circle_outline, size: 18),
+                              onPressed: () => onAcceptAlert(index),
+                              tooltip: 'Accept',
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOpenOrdersCard(BuildContext context) {
+    return DashboardCard(
+      title: 'Open Orders',
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (openOrders.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('No open orders', style: TextStyle(color: Color(0xFF8B909A))),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300),
+              child: Scrollbar(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: openOrders.length,
+                  itemBuilder: (context, index) {
+                    final order = openOrders[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        title: Text(order['title'] ?? ''),
+                        subtitle: Text('${order['group']} - ${order['time']}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              onPressed: () => onEditOpenOrder(index),
+                              tooltip: 'Edit',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.check_circle_outline, size: 18),
+                              onPressed: () => onAcceptOpenOrder(index),
+                              tooltip: 'Accept with team',
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClosedOrdersCard(BuildContext context) {
+    return DashboardCard(
+      title: 'Closed Orders',
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (closedOrders.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('No closed orders', style: TextStyle(color: Color(0xFF8B909A))),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300),
+              child: Scrollbar(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: closedOrders.length,
+                  itemBuilder: (context, index) {
+                    final order = closedOrders[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        title: Text(order['title'] ?? ''),
+                        subtitle: Text('${order['group']} - ${order['time']}'),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAverageHandlingCard() {
     return DashboardCard(
       title: 'Average handling Time',
-      width: 400,
+      width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
