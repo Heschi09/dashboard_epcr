@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../models/navigation_item.dart';
 import '../models/mock_data.dart';
 import '../widgets/side_menu.dart';
@@ -12,6 +14,10 @@ import '../dialogs/form_dialog.dart';
 import '../services/crew_service.dart';
 import '../services/vehicle_service.dart';
 import '../services/equipment_service.dart';
+import '../services/order_service.dart';
+import '../services/alert_service.dart';
+import '../services/backend_service.dart';
+import '../config/backend_config.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -25,6 +31,8 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Map<String, String>> _crew = const [];
   List<Map<String, String>> _vehicles = const [];
   List<Map<String, String>> _equipment = const [];
+  List<Map<String, String>> _alerts = const [];
+  List<Map<String, String>> _openOrders = const [];
   final List<Map<String, String>> _newOrders = List.from(MockData.newOrders);
 
   @override
@@ -33,25 +41,130 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadInitialData();
   }
 
-  Future<void> _loadInitialData() async {
-    final crew = await CrewService.instance.getAll();
-    final vehicles = await VehicleService.instance.getAll();
-    final equipment = await EquipmentService.instance.getAll();
+  Future<void> _testServerConnection() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    final results = <String>[];
+    results.add('Testing Server Connection...');
+    results.add('isFakeMode: ${BackendService.isFakeMode}');
+    results.add('Server URL: ${BackendConfig.fhirBaseUrl.value}');
+    results.add('');
+
+    try {
+      results.add('Testing: GET Practitioners...');
+      final practitioners = await BackendService.getAllPractitioners();
+      results.add('✅ Practitioners: ${practitioners.length} found');
+      results.add('');
+
+      results.add('Testing: GET Locations...');
+      final locations = await BackendService.getAllLocations();
+      results.add('✅ Locations: ${locations.length} found');
+      results.add('');
+
+      results.add('Testing: GET Devices...');
+      final devices = await BackendService.getAllDevices();
+      results.add('✅ Devices: ${devices.length} found');
+      results.add('');
+
+      results.add('✅ ALL TESTS PASSED');
+    } on SocketException catch (e) {
+      results.add('❌ NETWORK ERROR (SocketException):');
+      results.add('$e');
+      results.add('');
+      results.add('💡 Possible causes:');
+      results.add('- Server is not reachable');
+      results.add('- Network connection issue');
+      results.add('- Firewall blocking the connection');
+    } on http.ClientException catch (e) {
+      results.add('❌ CORS ERROR (ClientException):');
+      results.add('$e');
+      results.add('');
+      results.add('💡 This is a CORS (Cross-Origin) issue!');
+      results.add('The browser is blocking the request.');
+      results.add('');
+      results.add('✅ Solutions:');
+      results.add('1. Test on mobile/desktop (no CORS there)');
+      results.add('2. Enable CORS on the FHIR server');
+      results.add('3. Use a proxy server');
+      results.add('');
+      results.add('📝 To test on mobile/desktop:');
+      results.add('flutter run -d <device-id>');
+      results.add('(Get device-id with: flutter devices)');
+    } catch (e, stackTrace) {
+      results.add('❌ ERROR:');
+      results.add('Type: ${e.runtimeType}');
+      results.add('Message: $e');
+      results.add('');
+      results.add('Stack Trace:');
+      results.add(stackTrace.toString());
+    }
+
     if (!mounted) return;
-    setState(() {
-      _crew = crew;
-      _vehicles = vehicles;
-      _equipment = equipment;
-    });
+    Navigator.of(context).pop(); // Close loading dialog
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Server Connection Test'),
+        content: SingleChildScrollView(
+          child: Text(
+            results.join('\n'),
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _showAlertsDialog() {
+  Future<void> _loadInitialData() async {
+    try {
+      final crew = await CrewService.instance.getAll();
+      final vehicles = await VehicleService.instance.getAll();
+      final equipment = await EquipmentService.instance.getAll();
+      final alerts = await AlertService.instance.getAll();
+      final openOrders = await OrderService.instance.getOpen();
+      
+      if (!mounted) return;
+      setState(() {
+        _crew = crew;
+        _vehicles = vehicles;
+        _equipment = equipment;
+        _alerts = alerts;
+        _openOrders = openOrders;
+      });
+    } catch (e) {
+      // Set empty lists on error
+      if (mounted) {
+        setState(() {
+          _crew = [];
+          _vehicles = [];
+          _equipment = [];
+        });
+      }
+    }
+  }
+
+  Future<void> _showAlertsDialog() async {
+    final alerts = await AlertService.instance.getAll();
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => DetailDialog(
         title: 'Alerts',
         headers: const ['Number', 'Short Message', 'Time', 'Type'],
-        rows: MockData.alerts.map((item) => [
+        rows: alerts.map((item) => [
           item['nr']!,
           item['message']!,
           item['time']!,
@@ -61,13 +174,15 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _showOpenDialog() {
+  Future<void> _showOpenDialog() async {
+    final openOrders = await OrderService.instance.getOpen();
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => DetailDialog(
         title: 'Open Orders',
         headers: const ['Number', 'Short Message + Type', 'Group / Vehicle', 'Time'],
-        rows: MockData.openOrders.map((item) => [
+        rows: openOrders.map((item) => [
           item['nr']!,
           item['title']!,
           item['group']!,
@@ -321,20 +436,45 @@ class _DashboardPageState extends State<DashboardPage> {
     return result ?? false;
   }
 
-  void _showNewOrderDialog() {
-    showDialog(
+  Future<void> _showNewOrderDialog() async {
+    final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => const FormDialog(
         title: 'New Order',
         fields: [
-          {'label': 'Number', 'hint': 'Order number'},
-          {'label': 'Short Message + Type', 'hint': 'Enter message'},
-          {'label': 'Time', 'hint': 'HH:MM'},
-          {'label': 'Group', 'hint': 'Crew group'},
-          {'label': 'Vehicle', 'hint': 'Vehicle ID'},
+          {'label': 'Number', 'hint': 'Order number', 'key': 'nr'},
+          {'label': 'Short Message + Type', 'hint': 'Enter message', 'key': 'title'},
+          {'label': 'Time', 'hint': 'HH:MM', 'key': 'time'},
+          {'label': 'Group', 'hint': 'Crew group', 'key': 'group'},
         ],
       ),
     );
+
+    if (result != null) {
+      // Create order
+      await OrderService.instance.create({
+        'nr': result['nr'] ?? '',
+        'title': result['title'] ?? '',
+        'time': result['time'] ?? '',
+        'group': result['group'] ?? '',
+      });
+
+      // Add alert for new order
+      await AlertService.instance.addOrderAlert(
+        result['nr'] ?? '',
+        result['title'] ?? '',
+        result['time'] ?? '',
+      );
+
+      // Refresh data
+      final alerts = await AlertService.instance.getAll();
+      final openOrders = await OrderService.instance.getOpen();
+      if (!mounted) return;
+      setState(() {
+        _alerts = alerts;
+        _openOrders = openOrders;
+      });
+    }
   }
 
   Widget _buildCurrentScreen() {
@@ -349,6 +489,8 @@ class _DashboardPageState extends State<DashboardPage> {
           onNewEquipmentTap: _showNewEquipmentDialog,
           onNewOrderTap: _showNewOrderDialog,
           newOrders: _newOrders,
+          alertsCount: _alerts.length,
+          openOrdersCount: _openOrders.length,
         );
       case NavigationItem.pcr:
         return const PCRView();
@@ -381,6 +523,14 @@ class _DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (!BackendService.isFakeMode)
+            IconButton(
+              icon: const Icon(Icons.bug_report),
+              tooltip: 'Test Server Connection',
+              onPressed: _testServerConnection,
+            ),
+        ],
       ),
       body: SafeArea(
         child: Row(

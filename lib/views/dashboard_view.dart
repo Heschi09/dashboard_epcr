@@ -15,6 +15,8 @@ class DashboardView extends StatelessWidget {
     required this.onNewEquipmentTap,
     required this.onNewOrderTap,
     required this.newOrders,
+    required this.alertsCount,
+    required this.openOrdersCount,
   });
 
   final VoidCallback onAlertsTap;
@@ -25,6 +27,8 @@ class DashboardView extends StatelessWidget {
   final VoidCallback onNewEquipmentTap;
   final VoidCallback onNewOrderTap;
   final List<Map<String, String>> newOrders;
+  final int alertsCount;
+  final int openOrdersCount;
 
   @override
   Widget build(BuildContext context) {
@@ -54,12 +58,12 @@ class DashboardView extends StatelessWidget {
             children: [
               StatChip(
                 label: 'Alerts',
-                value: '18',
+                value: alertsCount.toString(),
                 onTap: onAlertsTap,
               ),
               StatChip(
                 label: 'Open',
-                value: '5',
+                value: openOrdersCount.toString(),
                 onTap: onOpenTap,
               ),
               StatChip(
