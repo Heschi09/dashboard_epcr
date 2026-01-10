@@ -19,9 +19,12 @@ class EquipmentService {
     try {
       final devices = await BackendService.getAllDevices();
       if (devices.isEmpty) {
+        _items = [];
         return [];
       }
-      return devices.map((d) => _deviceToMap(d)).toList();
+      final serverData = devices.map((d) => _deviceToMap(d)).toList();
+      _items = List<Map<String, String>>.from(serverData);
+      return serverData;
     } catch (e) {
       rethrow;
     }
@@ -52,8 +55,11 @@ class EquipmentService {
     }
 
     // TODO: Create FHIR Device resource for equipment
-    // For now, just add to local list
+    // For now, reload data from server after local add
     _items = [..._items, Map<String, String>.from(value)];
+    
+    // Reload from server to sync (once server create is implemented)
+    await getAll();
   }
 
   Future<void> update(int index, Map<String, String> value) async {
@@ -67,12 +73,15 @@ class EquipmentService {
       return;
     }
 
-    // TODO: Update FHIR Device (would need Device ID)
-    // For now, just update local list
+    // TODO: Update FHIR Device (would need Device ID from server)
+    // For now, reload data from server after local update
     final copy = Map<String, String>.from(value);
     final next = List<Map<String, String>>.from(_items);
     next[index] = copy;
     _items = next;
+    
+    // Reload from server to sync
+    await getAll();
   }
 
   Future<void> deleteAt(int index) async {
@@ -84,10 +93,13 @@ class EquipmentService {
       return;
     }
 
-    // TODO: Delete FHIR Device (would need Device ID)
-    // For now, just update local list
+    // TODO: Delete FHIR Device (would need Device ID from server)
+    // For now, reload data from server after local delete
     final next = List<Map<String, String>>.from(_items)..removeAt(index);
     _items = next;
+    
+    // Reload from server to sync
+    await getAll();
   }
 }
 

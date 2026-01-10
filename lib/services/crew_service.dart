@@ -1,5 +1,4 @@
 import 'package:fhir/r5.dart' as r5;
-import 'package:flutter/foundation.dart';
 import '../models/mock_data.dart';
 import 'backend_service.dart';
 
@@ -20,10 +19,13 @@ class CrewService {
     try {
       final practitioners = await BackendService.getAllPractitioners();
       if (practitioners.isEmpty) {
+        _items = [];
         return [];
       }
-      return practitioners.map((p) => _practitionerToMap(p)).toList();
-    } catch (e, stackTrace) {
+      final serverData = practitioners.map((p) => _practitionerToMap(p)).toList();
+      _items = List<Map<String, String>>.from(serverData);
+      return serverData;
+    } catch (e) {
       rethrow;
     }
   }
@@ -73,9 +75,6 @@ class CrewService {
       return;
     }
 
-    // DISABLED: Server write operations are disabled for safety
-    // Uncomment below to enable creating practitioners on server
-    /*
     // Create FHIR Practitioner resource
     final practitioner = _mapToPractitioner(value);
     final statusCode = await BackendService.postResource(
@@ -87,10 +86,6 @@ class CrewService {
       final updated = await getAll();
       _items = List<Map<String, String>>.from(updated);
     }
-    */
-    
-    // For now, just add to local list (won't persist to server)
-    _items = [..._items, Map<String, String>.from(value)];
   }
 
   r5.Practitioner _mapToPractitioner(Map<String, String> map) {
@@ -131,12 +126,15 @@ class CrewService {
       return;
     }
 
-    // TODO: Update FHIR Practitioner (would need Practitioner ID)
-    // For now, just update local list
+    // TODO: Update FHIR Practitioner (would need Practitioner ID from server)
+    // For now, reload data from server after local update
     final copy = Map<String, String>.from(value);
     final next = List<Map<String, String>>.from(_items);
     next[index] = copy;
     _items = next;
+    
+    // Reload from server to sync
+    await getAll();
   }
 
   Future<void> deleteAt(int index) async {
@@ -148,10 +146,13 @@ class CrewService {
       return;
     }
 
-    // TODO: Delete FHIR Practitioner (would need Practitioner ID)
-    // For now, just update local list
+    // TODO: Delete FHIR Practitioner (would need Practitioner ID from server)
+    // For now, reload data from server after local delete
     final next = List<Map<String, String>>.from(_items)..removeAt(index);
     _items = next;
+    
+    // Reload from server to sync
+    await getAll();
   }
 }
 

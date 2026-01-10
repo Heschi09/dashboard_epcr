@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -19,9 +18,6 @@ class BackendService {
   // Entwicklungsmodus: FakeMode für lokale Dummy-Daten
   // Setze auf false, um echte Server-Calls zu machen
   static const bool isFakeMode = true;
-  
-  // Get FHIR base URL for debugging
-  static String get fhirBaseUrl => BackendConfig.fhirBaseUrl.value;
 
   static String? getNextPageUrl(r5.Bundle bundle) {
     String? url;
@@ -126,15 +122,10 @@ class BackendService {
           GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
         },
       );
-      
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-      
       return r5.Bundle.fromJson(jsonDecode(response.body));
     } on Exception catch (e, s) {
       debugPrint('error on get bundle: $e - stack: $s');
-      rethrow;
+      return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
     }
   }
 

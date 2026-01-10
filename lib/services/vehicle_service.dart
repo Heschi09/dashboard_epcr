@@ -19,10 +19,13 @@ class VehicleService {
     try {
       final locations = await BackendService.getAllLocations();
       if (locations.isEmpty) {
+        _items = [];
         return [];
       }
-      return locations.map((l) => _locationToMap(l)).toList();
-    } catch (e, stackTrace) {
+      final serverData = locations.map((l) => _locationToMap(l)).toList();
+      _items = List<Map<String, String>>.from(serverData);
+      return serverData;
+    } catch (e) {
       rethrow;
     }
   }
@@ -55,8 +58,11 @@ class VehicleService {
     }
 
     // TODO: Create FHIR Location resource for vehicle
-    // For now, just add to local list
+    // For now, reload data from server after local add
     _items = [..._items, Map<String, String>.from(value)];
+    
+    // Reload from server to sync (once server create is implemented)
+    await getAll();
   }
 
   Future<void> update(int index, Map<String, String> value) async {
@@ -70,12 +76,15 @@ class VehicleService {
       return;
     }
 
-    // TODO: Update FHIR Location (would need Location ID)
-    // For now, just update local list
+    // TODO: Update FHIR Location (would need Location ID from server)
+    // For now, reload data from server after local update
     final copy = Map<String, String>.from(value);
     final next = List<Map<String, String>>.from(_items);
     next[index] = copy;
     _items = next;
+    
+    // Reload from server to sync
+    await getAll();
   }
 
   Future<void> deleteAt(int index) async {
@@ -87,10 +96,13 @@ class VehicleService {
       return;
     }
 
-    // TODO: Delete FHIR Location (would need Location ID)
-    // For now, just update local list
+    // TODO: Delete FHIR Location (would need Location ID from server)
+    // For now, reload data from server after local delete
     final next = List<Map<String, String>>.from(_items)..removeAt(index);
     _items = next;
+    
+    // Reload from server to sync
+    await getAll();
   }
 }
 
