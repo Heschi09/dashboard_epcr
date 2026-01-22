@@ -17,7 +17,7 @@ const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 class BackendService {
   // Entwicklungsmodus: FakeMode für lokale Dummy-Daten
   // Setze auf false, um echte Server-Calls zu machen
-  static const bool isFakeMode = true;
+  static const bool isFakeMode = false;
 
   static String? getNextPageUrl(r5.Bundle bundle) {
     String? url;

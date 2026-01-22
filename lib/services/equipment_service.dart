@@ -34,11 +34,13 @@ class EquipmentService {
     final name = device.type?.isNotEmpty == true
         ? device.type!.first.text ?? device.type!.first.coding?.firstOrNull?.display ?? 'Unknown'
         : 'Unknown';
+
+      final tmp_test = device.name!.isNotEmpty? device.name!.first.value?? 'a' : 'b';
     
     // For equipment, we might need to aggregate quantities
     // For now, use default values
     return {
-      'name': name,
+      'name': tmp_test,
       'qty': '0',
       'target': '0',
     };
@@ -72,7 +74,6 @@ class EquipmentService {
       _items = next;
       return;
     }
-
     // TODO: Update FHIR Device (would need Device ID from server)
     // For now, reload data from server after local update
     final copy = Map<String, String>.from(value);
