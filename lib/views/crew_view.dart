@@ -22,13 +22,21 @@ class CrewView extends StatelessWidget {
         title: 'Crew',
         width: double.infinity,
         child: SimpleTable(
-          headers: const ['Group', 'Name', 'Surname', 'Role'],
-          rows: crew.map((item) => [
-            item['group']!,
-            item['name']!,
-            item['surname']!,
-            item['role']!,
-          ]).toList(),
+          headers: const [
+            'ID',
+            'Name',
+            'Surname',
+            'Role',
+          ],
+          rows: crew.map((item) {
+            return [
+              item['id'] ?? '',
+              item['name'] ?? '',
+              item['surname'] ?? '',
+              // In der "Role"-Spalte soll jetzt der Identifier angezeigt werden
+              item['identifier'] ?? '',
+            ];
+          }).toList(),
           trailingBuilder: (index) => Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [

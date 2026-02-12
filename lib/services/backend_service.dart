@@ -111,6 +111,49 @@ class BackendService {
     }
   }
 
+  /// Update an existing FHIR resource via HTTP PUT.
+  /// [resourceType] e.g. "Practitioner", "Location"
+  /// [id] is the logical ID of the resource.
+  static Future<int> updateResource(
+      var fhirResource, String resourceType, String id) async {
+    if (isFakeMode) return 200;
+    try {
+      final http.Response responseFhir = await http.put(
+        Uri.parse('${BackendConfig.fhirBaseUrl.value}/$resourceType/$id'),
+        headers: <String, String>{
+          GeneralConstants.contentTypeHeader:
+              GeneralConstants.applicationJsonValue,
+          GeneralConstants.accept: GeneralConstants.applicationJsonValue,
+          GeneralConstants.xCustomEndpoint: resourceType,
+        },
+        body: jsonEncode(fhirResource),
+      );
+      return responseFhir.statusCode;
+    } on Exception catch (e, s) {
+      debugPrint('error on update resource: $e - stack: $s');
+      return 500;
+    }
+  }
+
+  /// Delete an existing FHIR resource via HTTP DELETE.
+  static Future<int> deleteResource(
+      String resourceType, String id) async {
+    if (isFakeMode) return 200;
+    try {
+      final http.Response responseFhir = await http.delete(
+        Uri.parse('${BackendConfig.fhirBaseUrl.value}/$resourceType/$id'),
+        headers: <String, String>{
+          GeneralConstants.accept: GeneralConstants.applicationJsonValue,
+          GeneralConstants.xCustomEndpoint: resourceType,
+        },
+      );
+      return responseFhir.statusCode;
+    } on Exception catch (e, s) {
+      debugPrint('error on delete resource: $e - stack: $s');
+      return 500;
+    }
+  }
+
   static Future<r5.Bundle> getBundle(String url) async {
     if (isFakeMode) {
       return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
@@ -163,20 +206,30 @@ class BackendService {
         for (var entry in bundle.entry!) {
           if (entry.resource is r5.Location) {
             final location = entry.resource as r5.Location;
-            // Filter for active ambulance locations
-            if (location.status != null &&
-                location.status.toString() == GeneralConstants.active &&
-                location.type != null &&
-                location.type!.any((t) {
-                  return t.coding != null &&
-                      t.coding!.any((c) {
-                        return (c.code != null &&
-                                c.code!.value == GeneralConstants.ambulanceCode &&
-                                c.system != null &&
-                                c.system!.value.toString() ==
-                                    GeneralConstants.codeSystemRoleCode);
-                      });
-                })) {
+
+            // Filter for active ambulance locations.
+            // Achtung: location.status ist ein Enum (z.B. LocationStatus.active),
+            // daher verwenden wir den letzten Teil des Enum-Namens für den Vergleich.
+            final String statusString = location.status != null
+                ? location.status.toString().split('.').last
+                : '';
+
+            final bool isActive = statusString == GeneralConstants.active;
+
+            bool isAmbulance = false;
+            if (location.type != null && location.type!.isNotEmpty) {
+              isAmbulance = location.type!.any((t) {
+                return t.coding != null &&
+                    t.coding!.any((c) {
+                      final String? code = c.code?.value;
+                      final String? system = c.system?.value?.toString();
+                      return code == GeneralConstants.ambulanceCode &&
+                          system == GeneralConstants.codeSystemRoleCode;
+                    });
+              });
+            }
+
+            if (isActive && isAmbulance) {
               locations.add(location);
             }
           }

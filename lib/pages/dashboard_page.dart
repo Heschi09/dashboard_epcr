@@ -624,12 +624,24 @@ class _DashboardPageState extends State<DashboardPage> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         actions: [
-          if (!BackendService.isFakeMode)
+          if (!BackendService.isFakeMode) ...[
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Reload data from server',
+              onPressed: () async {
+                await _loadInitialData();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Data reloaded from server')),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.bug_report),
               tooltip: 'Test Server Connection',
               onPressed: _testServerConnection,
             ),
+          ],
         ],
       ),
       body: SafeArea(

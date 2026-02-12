@@ -22,12 +22,25 @@ class VehiclesView extends StatelessWidget {
         title: 'Vehicles',
         width: double.infinity,
         child: SimpleTable(
-          headers: const ['Vehicle', 'License plate', 'Status'],
-          rows: vehicles.map((item) => [
-            item['vehicle']!,
-            item['plate']!,
-            item['status']!,
-          ]).toList(),
+          headers: const [
+            'ID',
+            'License plate',
+            'Vehicle type',
+            'Description',
+            'Status',
+          ],
+          rows: vehicles.map((item) {
+            return [
+              item['id'] ?? '',
+              // Fallback: wenn "plate" leer ist (Mock-Daten), nimm "vehicle"
+              item['plate']?.isNotEmpty == true
+                  ? item['plate']!
+                  : (item['vehicle'] ?? ''),
+              item['type'] ?? item['vehicle'] ?? '',
+              item['description'] ?? '',
+              item['status'] ?? '',
+            ];
+          }).toList(),
           trailingBuilder: (index) => Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
