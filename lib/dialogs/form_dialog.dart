@@ -121,6 +121,7 @@ class _FormDialogState extends State<FormDialog> {
                 }
                 
                 // Regular text field
+                final isOptional = field['required'] == 'false';
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: TextFormField(
@@ -133,7 +134,7 @@ class _FormDialogState extends State<FormDialog> {
                       ),
                     ),
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
+                      if (!isOptional && (value == null || value.trim().isEmpty)) {
                         return 'Required';
                       }
                       return null;

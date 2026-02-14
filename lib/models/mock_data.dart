@@ -21,10 +21,10 @@ class MockData {
   ];
 
   static final vehicles = [
-    {'vehicle': 'Ambu-01', 'plate': 'RW-512', 'status': 'Available'},
+    {'vehicle': 'Ambu-01', 'plate': 'RW-512', 'status': 'Active'},
     {'vehicle': 'Ambu-02', 'plate': 'RW-871', 'status': 'Maintenance'},
     {'vehicle': 'Rapid-03', 'plate': 'RW-334', 'status': 'On Mission'},
-    {'vehicle': 'Ambu-04', 'plate': 'RW-445', 'status': 'Available'},
+    {'vehicle': 'Ambu-04', 'plate': 'RW-445', 'status': 'Active'},
   ];
 
   static final equipment = [

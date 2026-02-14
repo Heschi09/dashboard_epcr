@@ -15,8 +15,8 @@ const FlutterAppAuth appAuth = FlutterAppAuth();
 const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
 class BackendService {
-  // Entwicklungsmodus: FakeMode für lokale Dummy-Daten
-  // Setze auf false, um echte Server-Calls zu machen
+  // Entwicklungsmodus: false = echte CRUD-Operationen auf Server (http://10.25.6.2:8084/)
+  // true = nur lokale Dummy-Daten ohne Server-Calls
   static const bool isFakeMode = false;
 
   static String? getNextPageUrl(r5.Bundle bundle) {
@@ -207,15 +207,8 @@ class BackendService {
           if (entry.resource is r5.Location) {
             final location = entry.resource as r5.Location;
 
-            // Filter for active ambulance locations.
-            // Achtung: location.status ist ein Enum (z.B. LocationStatus.active),
-            // daher verwenden wir den letzten Teil des Enum-Namens für den Vergleich.
-            final String statusString = location.status != null
-                ? location.status.toString().split('.').last
-                : '';
-
-            final bool isActive = statusString == GeneralConstants.active;
-
+            // Filter: nur Ambulanz-Locations (alle Status: active, suspended, inactive),
+            // damit auch "Maintenance"- und "On Mission"-Fahrzeuge angezeigt werden.
             bool isAmbulance = false;
             if (location.type != null && location.type!.isNotEmpty) {
               isAmbulance = location.type!.any((t) {
@@ -229,7 +222,7 @@ class BackendService {
               });
             }
 
-            if (isActive && isAmbulance) {
+            if (isAmbulance) {
               locations.add(location);
             }
           }

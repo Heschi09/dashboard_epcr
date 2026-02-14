@@ -45,10 +45,11 @@ class VehicleService {
     // Beschreibung der Ambulanz (falls vorhanden)
     final String description = location.description?.toString() ?? '';
 
-    // Status des Fahrzeugs (z.B. "active")
-    final String status = location.status != null
+    // Status des Fahrzeugs – FHIR liefert active/suspended/inactive, UI nutzt Active/On Mission/Maintenance
+    final String rawStatus = location.status != null
         ? location.status.toString().split('.').last
         : 'active';
+    final String status = _fhirStatusToDisplay(rawStatus);
 
     // Typ / Rolle (z.B. Ambulance) aus Location.type.coding
     String typeDisplay = '';
@@ -73,6 +74,28 @@ class VehicleService {
     };
   }
 
+  String _fhirStatusToDisplay(String fhirStatus) {
+    switch (fhirStatus.toLowerCase()) {
+      case 'suspended':
+        return 'Maintenance';
+      case 'inactive':
+        return 'Maintenance';
+      default:
+        return 'Active';
+    }
+  }
+
+  String _displayStatusToFhir(String displayStatus) {
+    switch (displayStatus) {
+      case 'Maintenance':
+        return 'suspended';
+      case 'On Mission':
+      case 'Active':
+      default:
+        return 'active';
+    }
+  }
+
   Future<void> reset() async {
     _items = List<Map<String, String>>.from(MockData.vehicles);
   }
@@ -84,9 +107,10 @@ class VehicleService {
     }
 
     // Erzeuge eine neue FHIR-Location für das Fahrzeug.
+    final fhirStatus = _displayStatusToFhir(value['status'] ?? 'Active');
     final Map<String, dynamic> locationJson = {
       'resourceType': 'Location',
-      'status': value['status'] ?? 'active',
+      'status': fhirStatus,
       'name': value['plate'] ?? '',
       'description': value['description'] ?? '',
       'mode': 'instance',
@@ -154,10 +178,8 @@ class VehicleService {
     locationJson['name'] = value['plate'] ?? '';
     locationJson['description'] = value['description'] ?? '';
 
-    // Status aus der UI übernehmen, Standard "active"
-    final status = (value['status'] ?? '').isNotEmpty
-        ? value['status']
-        : 'active';
+    // Status aus der UI (Active/On Mission/Maintenance) auf FHIR (active/suspended) mappen
+    final status = _displayStatusToFhir(value['status'] ?? 'Active');
     locationJson['status'] = status;
 
     // Typ / Fahrzeugart aktualisieren

@@ -301,22 +301,21 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _showNewCrewMemberDialog() async {
+    // Felder wie in Crew View: Name, Surname, Role. ID wird automatisch vom Server vergeben.
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => FormDialog(
         title: 'New Crew Member',
         fields: const [
-          {'label': 'Group', 'hint': 'Enter group', 'key': 'group'},
           {'label': 'Name', 'hint': 'Enter name', 'key': 'name'},
           {'label': 'Surname', 'hint': 'Enter surname', 'key': 'surname'},
-          {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Paramedic,Driver,Nurse,Doctor'},
+          {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Driver,Medic,Physician'},
         ],
       ),
     );
 
     if (result != null) {
       await CrewService.instance.create({
-        'group': result['group'] ?? 'New',
         'name': result['name'] ?? '',
         'surname': result['surname'] ?? '',
         'role': result['role'] ?? '',
@@ -330,23 +329,26 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _showNewVehicleDialog() async {
+    // Felder wie in Vehicles View: License plate, Vehicle type, Description, Status. ID wird automatisch vom Server vergeben.
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => const FormDialog(
-        title: 'New Vehicle',
+        title: 'Register new vehicle',
         fields: [
-          {'label': 'Vehicle', 'hint': 'e.g. Ambu-05', 'key': 'vehicle'},
           {'label': 'License plate', 'hint': 'e.g. RW-999', 'key': 'plate'},
-          {'label': 'Status', 'hint': 'Select status', 'key': 'status', 'type': 'dropdown', 'options': 'Available,Maintenance,On Mission'},
+          {'label': 'Vehicle type', 'hint': 'e.g. Ambulance, Ambu-05', 'key': 'vehicle'},
+          {'label': 'Description', 'hint': 'Optional description', 'key': 'description', 'required': 'false'},
+          {'label': 'Status', 'hint': 'Select status', 'key': 'status', 'type': 'dropdown', 'options': 'Active,On Mission,Maintenance'},
         ],
       ),
     );
 
     if (result != null) {
       await VehicleService.instance.create({
-        'vehicle': result['vehicle'] ?? '',
         'plate': result['plate'] ?? '',
-        'status': result['status'] ?? 'Available',
+        'vehicle': result['vehicle'] ?? 'Ambulance',
+        'description': result['description'] ?? '',
+        'status': result['status'] ?? 'Active',
       });
       final vehicles = await VehicleService.instance.getAll();
       if (!mounted) return;
@@ -428,16 +430,14 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'Edit Crew Member',
         initialValues: current,
         fields: const [
-          {'label': 'Group', 'hint': 'Enter group', 'key': 'group'},
           {'label': 'Name', 'hint': 'Enter name', 'key': 'name'},
           {'label': 'Surname', 'hint': 'Enter surname', 'key': 'surname'},
-          {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Paramedic,Driver,Nurse,Doctor'},
+          {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Driver,Medic,Physician'},
         ],
       ),
     );
     if (result != null) {
       await CrewService.instance.update(index, {
-        'group': result['group'] ?? current['group'] ?? '',
         'name': result['name'] ?? current['name'] ?? '',
         'surname': result['surname'] ?? current['surname'] ?? '',
         'role': result['role'] ?? current['role'] ?? '',
@@ -461,7 +461,7 @@ class _DashboardPageState extends State<DashboardPage> {
         fields: const [
           {'label': 'Vehicle', 'hint': 'e.g. Ambu-05', 'key': 'vehicle'},
           {'label': 'License plate', 'hint': 'e.g. RW-999', 'key': 'plate'},
-          {'label': 'Status', 'hint': 'Select status', 'key': 'status', 'type': 'dropdown', 'options': 'Available,Maintenance,On Mission'},
+          {'label': 'Status', 'hint': 'Select status', 'key': 'status', 'type': 'dropdown', 'options': 'Active,On Mission,Maintenance'},
         ],
       ),
     );
@@ -469,7 +469,7 @@ class _DashboardPageState extends State<DashboardPage> {
       await VehicleService.instance.update(index, {
         'vehicle': result['vehicle'] ?? current['vehicle'] ?? '',
         'plate': result['plate'] ?? current['plate'] ?? '',
-        'status': result['status'] ?? current['status'] ?? 'Available',
+        'status': result['status'] ?? current['status'] ?? 'Active',
       });
       final vehicles = await VehicleService.instance.getAll();
       if (!mounted) return;
