@@ -24,17 +24,16 @@ class CrewView extends StatelessWidget {
         child: SimpleTable(
           headers: const [
             'ID',
-            'Name',
-            'Surname',
+            'Position',
+            'Last Name',
             'Role',
           ],
           rows: crew.map((item) {
             return [
               item['id'] ?? '',
-              item['name'] ?? '',
+              item['position'] ?? '',
               item['surname'] ?? '',
-              // In der "Role"-Spalte soll jetzt der Identifier angezeigt werden
-              item['identifier'] ?? '',
+              item['identifier'] ?? '', // Displaying identifier/role as requested
             ];
           }).toList(),
           trailingBuilder: (index) => Row(

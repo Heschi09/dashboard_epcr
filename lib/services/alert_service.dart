@@ -1,8 +1,8 @@
-import '../models/mock_data.dart';
+
 
 class AlertService {
   AlertService._internal() {
-    _items = List<Map<String, String>>.from(MockData.alerts);
+    _items = [];
   }
 
   static final AlertService instance = AlertService._internal();
@@ -10,12 +10,11 @@ class AlertService {
   late List<Map<String, String>> _items;
 
   Future<List<Map<String, String>>> getAll() async {
-    await Future.delayed(const Duration(milliseconds: 50));
     return List.unmodifiable(_items);
   }
 
   Future<void> reset() async {
-    _items = List<Map<String, String>>.from(MockData.alerts);
+    _items = [];
   }
 
   Future<void> create(Map<String, String> value) async {

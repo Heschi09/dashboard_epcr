@@ -40,6 +40,8 @@ dependencies:
   fhir: ^0.12.0
   flutter_appauth: ^11.0.0
   flutter_secure_storage: ^9.2.2
+  shelf: ^1.4.2
+  shelf_proxy: ^1.0.4
 
 dev_dependencies:
   flutter_test:

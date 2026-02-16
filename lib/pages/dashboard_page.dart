@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/navigation_item.dart';
-import '../models/mock_data.dart';
 import '../widgets/side_menu.dart';
 import '../views/dashboard_view.dart';
 import '../views/pcr_view.dart';
@@ -34,7 +33,7 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Map<String, String>> _alerts = const [];
   List<Map<String, String>> _openOrders = const [];
   List<Map<String, String>> _closedOrders = const [];
-  final List<Map<String, String>> _newOrders = List.from(MockData.newOrders);
+  final List<Map<String, String>> _newOrders = [];
 
   @override
   void initState() {
@@ -53,7 +52,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final results = <String>[];
     results.add('Testing Server Connection...');
-    results.add('isFakeMode: ${BackendService.isFakeMode}');
     results.add('Server URL: ${BackendConfig.fhirBaseUrl.value}');
     results.add('');
 
@@ -307,8 +305,8 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => FormDialog(
         title: 'New Crew Member',
         fields: const [
-          {'label': 'Name', 'hint': 'Enter name', 'key': 'name'},
-          {'label': 'Surname', 'hint': 'Enter surname', 'key': 'surname'},
+          {'label': 'Position', 'hint': 'e.g. First', 'key': 'position'},
+          {'label': 'Last Name', 'hint': 'e.g. Driver', 'key': 'surname'},
           {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Driver,Medic,Physician'},
         ],
       ),
@@ -316,7 +314,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     if (result != null) {
       await CrewService.instance.create({
-        'name': result['name'] ?? '',
+        'position': result['position'] ?? '',
         'surname': result['surname'] ?? '',
         'role': result['role'] ?? '',
       });
@@ -430,15 +428,15 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'Edit Crew Member',
         initialValues: current,
         fields: const [
-          {'label': 'Name', 'hint': 'Enter name', 'key': 'name'},
-          {'label': 'Surname', 'hint': 'Enter surname', 'key': 'surname'},
+          {'label': 'Position', 'hint': 'e.g. First', 'key': 'position'},
+          {'label': 'Last Name', 'hint': 'e.g. Driver', 'key': 'surname'},
           {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Driver,Medic,Physician'},
         ],
       ),
     );
     if (result != null) {
       await CrewService.instance.update(index, {
-        'name': result['name'] ?? current['name'] ?? '',
+        'position': result['position'] ?? current['position'] ?? '',
         'surname': result['surname'] ?? current['surname'] ?? '',
         'role': result['role'] ?? current['role'] ?? '',
       });
@@ -624,24 +622,22 @@ class _DashboardPageState extends State<DashboardPage> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         actions: [
-          if (!BackendService.isFakeMode) ...[
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: 'Reload data from server',
-              onPressed: () async {
-                await _loadInitialData();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Data reloaded from server')),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.bug_report),
-              tooltip: 'Test Server Connection',
-              onPressed: _testServerConnection,
-            ),
-          ],
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: 'Reload data from server',
+            onPressed: () async {
+              await _loadInitialData();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Data reloaded from server')),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Test Server Connection',
+            onPressed: _testServerConnection,
+          ),
         ],
       ),
       body: SafeArea(

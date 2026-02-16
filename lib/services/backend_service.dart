@@ -15,9 +15,8 @@ const FlutterAppAuth appAuth = FlutterAppAuth();
 const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
 class BackendService {
-  // Entwicklungsmodus: false = echte CRUD-Operationen auf Server (http://10.25.6.2:8084/)
-  // true = nur lokale Dummy-Daten ohne Server-Calls
-  static const bool isFakeMode = false;
+
+
 
   static String? getNextPageUrl(r5.Bundle bundle) {
     String? url;
@@ -38,7 +37,6 @@ class BackendService {
 
   static Future<int> postResourceWithAuth(
       var fhirResource, var fhirResourceType) async {
-    if (isFakeMode) return 200;
     final String? storedRefreshToken =
         await secureStorage.read(key: GeneralConstants.refreshToken);
     if (storedRefreshToken == null) {
@@ -76,7 +74,6 @@ class BackendService {
   }
 
   static Future<int> postResource(var fhirResource, var fhirResourceType) async {
-    if (isFakeMode) return 200;
     try {
       final http.Response responseFhir = await http.post(
         Uri.parse('${BackendConfig.fhirBaseUrl.value}/$fhirResourceType'),
@@ -95,7 +92,6 @@ class BackendService {
   }
 
   static Future<int> postBundle(r5.Bundle fhirBundle) async {
-    if (isFakeMode) return 200;
     try {
       final http.Response responseFhir = await http.post(
         Uri.parse(BackendConfig.fhirBaseUrl.value),
@@ -111,23 +107,26 @@ class BackendService {
     }
   }
 
-  /// Update an existing FHIR resource via HTTP PUT.
-  /// [resourceType] e.g. "Practitioner", "Location"
-  /// [id] is the logical ID of the resource.
   static Future<int> updateResource(
-      var fhirResource, String resourceType, String id) async {
-    if (isFakeMode) return 200;
+      var fhirResource, var fhirResourceType, String id) async {
     try {
+      final String? token = await _getAccessToken();
+      final Map<String, String> headers = {
+        GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+        GeneralConstants.accept: GeneralConstants.applicationJsonValue,
+        GeneralConstants.xCustomEndpoint: fhirResourceType,
+      };
+      if (token != null) {
+        headers[GeneralConstants.authorization] =
+            '${GeneralConstants.bearer} $token';
+      }
+
       final http.Response responseFhir = await http.put(
-        Uri.parse('${BackendConfig.fhirBaseUrl.value}/$resourceType/$id'),
-        headers: <String, String>{
-          GeneralConstants.contentTypeHeader:
-              GeneralConstants.applicationJsonValue,
-          GeneralConstants.accept: GeneralConstants.applicationJsonValue,
-          GeneralConstants.xCustomEndpoint: resourceType,
-        },
+        Uri.parse('${BackendConfig.fhirBaseUrl.value}/$fhirResourceType/$id'),
+        headers: headers,
         body: jsonEncode(fhirResource),
       );
+      debugPrint('Update response: ${responseFhir.statusCode} ${responseFhir.body}');
       return responseFhir.statusCode;
     } on Exception catch (e, s) {
       debugPrint('error on update resource: $e - stack: $s');
@@ -135,17 +134,21 @@ class BackendService {
     }
   }
 
-  /// Delete an existing FHIR resource via HTTP DELETE.
-  static Future<int> deleteResource(
-      String resourceType, String id) async {
-    if (isFakeMode) return 200;
+  static Future<int> deleteResource(var fhirResourceType, String id) async {
     try {
+      final String? token = await _getAccessToken();
+      final Map<String, String> headers = {
+        GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+        GeneralConstants.xCustomEndpoint: fhirResourceType,
+      };
+      if (token != null) {
+        headers[GeneralConstants.authorization] =
+            '${GeneralConstants.bearer} $token';
+      }
+
       final http.Response responseFhir = await http.delete(
-        Uri.parse('${BackendConfig.fhirBaseUrl.value}/$resourceType/$id'),
-        headers: <String, String>{
-          GeneralConstants.accept: GeneralConstants.applicationJsonValue,
-          GeneralConstants.xCustomEndpoint: resourceType,
-        },
+        Uri.parse('${BackendConfig.fhirBaseUrl.value}/$fhirResourceType/$id'),
+        headers: headers,
       );
       return responseFhir.statusCode;
     } on Exception catch (e, s) {
@@ -154,17 +157,51 @@ class BackendService {
     }
   }
 
-  static Future<r5.Bundle> getBundle(String url) async {
-    if (isFakeMode) {
-      return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
+  static Future<String?> _getAccessToken() async {
+    final String? storedRefreshToken =
+        await secureStorage.read(key: GeneralConstants.refreshToken);
+    if (storedRefreshToken == null) {
+      return null;
     }
     try {
+      final TokenResponse? response = await appAuth.token(TokenRequest(
+        KeycloakConfig.clientId.value,
+        KeycloakConfig.redirectUri.value,
+        issuer: KeycloakConfig.issuer.value,
+        refreshToken: storedRefreshToken,
+        scopes: <String>[
+          GeneralConstants.openid,
+          GeneralConstants.offlineAccess
+        ],
+        allowInsecureConnections:
+            KeycloakConfig.scheme.value != GeneralConstants.https,
+      ));
+      return response?.accessToken;
+    } on Exception catch (e, s) {
+      debugPrint('error on refresh token: $e - stack: $s');
+      return null;
+    }
+  }
+
+  static Future<r5.Bundle> getBundle(String url) async {
+    try {
+      final String? token = await _getAccessToken();
+      final Map<String, String> headers = {
+        GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+      };
+      if (token != null) {
+        headers[GeneralConstants.authorization] =
+            '${GeneralConstants.bearer} $token';
+      }
+
       final http.Response response = await http.get(
         Uri.parse(url),
-        headers: <String, String>{
-          GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
-        },
+        headers: headers,
       );
+      if (response.statusCode == 401) {
+        debugPrint('Unauthorized access to $url');
+        return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
+      }
       return r5.Bundle.fromJson(jsonDecode(response.body));
     } on Exception catch (e, s) {
       debugPrint('error on get bundle: $e - stack: $s');
@@ -173,9 +210,6 @@ class BackendService {
   }
 
   static Future<List<r5.Practitioner>> getAllPractitioners() async {
-    if (isFakeMode) {
-      return [];
-    }
     String? url =
         '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.practitionerResourceName}';
     List<r5.Practitioner> practitioners = [];
@@ -194,49 +228,50 @@ class BackendService {
   }
 
   static Future<List<r5.Location>> getAllLocations() async {
-    if (isFakeMode) {
-      return [];
-    }
     String? url =
         '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.locationResourceName}';
     List<r5.Location> locations = [];
     while (url != null) {
       final bundle = await getBundle(url);
       if (bundle.entry != null) {
+        debugPrint('Fetched ${bundle.entry!.length} location entries from server.');
         for (var entry in bundle.entry!) {
           if (entry.resource is r5.Location) {
             final location = entry.resource as r5.Location;
+            
+            // Debugging: Print candidate location details
+            debugPrint('Checking Location: ${location.id}, Status: ${location.status}, Type: ${location.type?.map((t) => t.coding?.map((c) => c.code).toList()).toList()}');
 
-            // Filter: nur Ambulanz-Locations (alle Status: active, suspended, inactive),
-            // damit auch "Maintenance"- und "On Mission"-Fahrzeuge angezeigt werden.
-            bool isAmbulance = false;
-            if (location.type != null && location.type!.isNotEmpty) {
-              isAmbulance = location.type!.any((t) {
-                return t.coding != null &&
-                    t.coding!.any((c) {
-                      final String? code = c.code?.value;
-                      final String? system = c.system?.value?.toString();
-                      return code == GeneralConstants.ambulanceCode &&
-                          system == GeneralConstants.codeSystemRoleCode;
-                    });
-              });
-            }
+            // Filter for active ambulance locations
+            // Fix: Compare enum directly
+            final isActive = location.status == r5.LocationStatus.active;
+            
+            final isAmbulance = location.type != null &&
+                location.type!.any((t) {
+                  return t.coding != null &&
+                      t.coding!.any((c) {
+                        // Check for code 'AMB' (Ambulance)
+                        // Relaxing system check slightly to avoid issues with exact URL string matches if they differ
+                        final isAmbCode = c.code != null && c.code!.value == GeneralConstants.ambulanceCode;
+                        return isAmbCode;
+                      });
+                });
 
-            if (isAmbulance) {
+            if (isActive && isAmbulance) {
               locations.add(location);
+            } else {
+               debugPrint('Location ${location.id} skipped. Active: $isActive, IsAmbulance: $isAmbulance');
             }
           }
         }
       }
       url = getNextPageUrl(bundle);
     }
+    debugPrint('Returning ${locations.length} valid ambulance locations.');
     return locations;
   }
 
   static Future<List<r5.Device>> getAllDevices() async {
-    if (isFakeMode) {
-      return [];
-    }
     String? url =
         '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.deviceResourceName}';
     List<r5.Device> devices = [];

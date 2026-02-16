@@ -1,9 +1,9 @@
-import '../models/mock_data.dart';
+
 
 class OrderService {
   OrderService._internal() {
-    _openOrders = List<Map<String, String>>.from(MockData.openOrders);
-    _closedOrders = List<Map<String, String>>.from(MockData.closedOrders);
+    _openOrders = [];
+    _closedOrders = [];
   }
 
   static final OrderService instance = OrderService._internal();
@@ -12,12 +12,10 @@ class OrderService {
   late List<Map<String, String>> _closedOrders;
 
   Future<List<Map<String, String>>> getOpen() async {
-    await Future.delayed(const Duration(milliseconds: 50));
     return List.unmodifiable(_openOrders);
   }
 
   Future<List<Map<String, String>>> getClosed() async {
-    await Future.delayed(const Duration(milliseconds: 50));
     return List.unmodifiable(_closedOrders);
   }
 
@@ -30,7 +28,6 @@ class OrderService {
   }
 
   Future<void> create(Map<String, String> order) async {
-    await Future.delayed(const Duration(milliseconds: 100));
     _openOrders = [..._openOrders, Map<String, String>.from(order)];
   }
 
@@ -54,7 +51,6 @@ class OrderService {
   }
 
   Future<void> close(String orderNr) async {
-    await Future.delayed(const Duration(milliseconds: 100));
     final order = _openOrders.firstWhere(
       (o) => o['nr'] == orderNr,
       orElse: () => {},
@@ -66,7 +62,7 @@ class OrderService {
   }
 
   Future<void> reset() async {
-    _openOrders = List<Map<String, String>>.from(MockData.openOrders);
-    _closedOrders = List<Map<String, String>>.from(MockData.closedOrders);
+    _openOrders = [];
+    _closedOrders = [];
   }
 }

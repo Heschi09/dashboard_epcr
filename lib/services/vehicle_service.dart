@@ -1,11 +1,11 @@
 import 'package:fhir/r5.dart' as r5;
-import '../models/mock_data.dart';
+
 import '../config/general_constants.dart';
 import 'backend_service.dart';
 
 class VehicleService {
   VehicleService._internal() {
-    _items = List<Map<String, String>>.from(MockData.vehicles);
+    _items = [];
     _locationResources = <r5.Location>[];
   }
 
@@ -16,10 +16,6 @@ class VehicleService {
   late List<r5.Location> _locationResources;
 
   Future<List<Map<String, String>>> getAll() async {
-    if (BackendService.isFakeMode) {
-      return List<Map<String, String>>.unmodifiable(_items);
-    }
-
     try {
       final locations = await BackendService.getAllLocations();
       if (locations.isEmpty) {
@@ -97,15 +93,11 @@ class VehicleService {
   }
 
   Future<void> reset() async {
-    _items = List<Map<String, String>>.from(MockData.vehicles);
+    _items = [];
+    await getAll();
   }
 
   Future<void> create(Map<String, String> value) async {
-    if (BackendService.isFakeMode) {
-      _items = [..._items, Map<String, String>.from(value)];
-      return;
-    }
-
     // Erzeuge eine neue FHIR-Location für das Fahrzeug.
     final fhirStatus = _displayStatusToFhir(value['status'] ?? 'Active');
     final Map<String, dynamic> locationJson = {
@@ -141,22 +133,9 @@ class VehicleService {
   Future<void> update(int index, Map<String, String> value) async {
     if (index < 0 || index >= _items.length) return;
 
-    if (BackendService.isFakeMode) {
-      final copy = Map<String, String>.from(value);
-      final next = List<Map<String, String>>.from(_items);
-      next[index] = copy;
-      _items = next;
-      return;
-    }
-
     final current = _items[index];
     final id = current['id'] ?? '';
     if (id.isEmpty) {
-      // Ohne ID können wir nicht sauber updaten – dann nur lokal anpassen.
-      final copy = Map<String, String>.from(value);
-      final next = List<Map<String, String>>.from(_items);
-      next[index] = copy;
-      _items = next;
       return;
     }
 
@@ -210,18 +189,9 @@ class VehicleService {
   Future<void> deleteAt(int index) async {
     if (index < 0 || index >= _items.length) return;
 
-    if (BackendService.isFakeMode) {
-      final next = List<Map<String, String>>.from(_items)..removeAt(index);
-      _items = next;
-      return;
-    }
-
     final current = _items[index];
     final id = current['id'] ?? '';
     if (id.isEmpty) {
-      // Fallback: nur lokal löschen, wenn keine ID vorhanden ist.
-      final next = List<Map<String, String>>.from(_items)..removeAt(index);
-      _items = next;
       return;
     }
 
