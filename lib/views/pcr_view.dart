@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/dashboard_card.dart';
 import '../services/pcr_service.dart';
+import '../services/pdf_export_service.dart';
 
 class PCRView extends StatefulWidget {
   const PCRView({super.key});
@@ -110,6 +111,16 @@ class _PCRViewState extends State<PCRView> {
                   OutlinedButton(
                     onPressed: () => _loadData(),
                     child: const Text('Load Latest'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: _pcrData != null ? () => PdfExportService.exportPdf(_pcrData!) : null,
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('Export PDF'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFCE1126), // Rwanda Red
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ],
               ),
