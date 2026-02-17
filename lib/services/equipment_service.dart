@@ -1,5 +1,6 @@
 import 'package:fhir/r5.dart' as r5;
 
+import '../config/general_constants.dart';
 import 'backend_service.dart';
 
 class EquipmentService {
@@ -18,6 +19,7 @@ class EquipmentService {
         _items = [];
         return [];
       }
+      _deviceResources = devices; // Store original resources
       final serverData = devices.map((d) => _deviceToMap(d)).toList();
       _items = List<Map<String, String>>.from(serverData);
       return serverData;
@@ -26,18 +28,46 @@ class EquipmentService {
     }
   }
 
-  Map<String, String> _deviceToMap(r5.Device device) {
-    // Check if the device name list is not empty, otherwise use fallback
-    final tmp_test = device.name?.isNotEmpty == true
-        ? device.name!.first.value ?? 'a'
-        : 'b';
+  // Original FHIR resources kept in the same order as [_items]
+  late List<r5.Device> _deviceResources;
 
-    // For equipment, we might need to aggregate quantities
-    // For now, use default values
+  Map<String, String> _deviceToMap(r5.Device device) {
+    String name = 'Equipment';
+    // Use 'name' getter as per original file, assuming it maps to deviceName
+    // Use '.value' on the item, assuming it maps to the name string
+    if (device.name != null && device.name!.isNotEmpty) {
+      name = device.name!.first.value ?? '';
+    }
+
+    String qty = '0';
+    String target = '0';
+    
+    // ... rest unchanged ...
+
+    // Parse qty and target from note if available
+    if (device.note != null && device.note!.isNotEmpty) {
+      // Look for a note that looks like our JSON structure
+      for (final annotation in device.note!) {
+        final text = annotation.text?.toString() ?? '';
+        if (text.startsWith('{') && text.contains('"qty"')) {
+          try {
+             final qtyMatch = RegExp(r'"qty"\s*:\s*"([^"]+)"').firstMatch(text);
+             final targetMatch = RegExp(r'"target"\s*:\s*"([^"]+)"').firstMatch(text);
+             
+             if (qtyMatch != null) qty = qtyMatch.group(1) ?? '0';
+             if (targetMatch != null) target = targetMatch.group(1) ?? '0';
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
+
     return {
-      'name': tmp_test,
-      'qty': '0',
-      'target': '0',
+      'id': device.id?.toString() ?? '',
+      'name': name,
+      'qty': qty,
+      'target': target,
     };
   }
 
@@ -47,38 +77,91 @@ class EquipmentService {
   }
 
   Future<void> create(Map<String, String> value) async {
-    // TODO: Create FHIR Device resource for equipment
-    // For now, load data from server after local add
-    _items = [..._items, Map<String, String>.from(value)];
+    final noteJson = '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
+    
+    final Map<String, dynamic> deviceJson = {
+      'resourceType': 'Device',
+      'status': 'active',
+      'deviceName': [
+        {
+          'name': value['name'] ?? 'Equipment',
+          'type': 'user-friendly-name'
+        }
+      ],
+      'note': [
+        {'text': noteJson}
+      ]
+    };
 
-    // Reload from server to sync (once server create is implemented)
-    await getAll();
+    final statusCode = await BackendService.postResource(
+      deviceJson,
+      GeneralConstants.deviceResourceName,
+    );
+
+    if (statusCode == 200 || statusCode == 201) {
+      await getAll();
+    }
   }
 
   Future<void> update(int index, Map<String, String> value) async {
     if (index < 0 || index >= _items.length) return;
 
-    // TODO: Update FHIR Device (would need Device ID from server)
-    // For now, reload data from server after local update
-    final copy = Map<String, String>.from(value);
-    final next = List<Map<String, String>>.from(_items);
-    next[index] = copy;
-    _items = next;
+    final current = _items[index];
+    final id = current['id'] ?? '';
+    if (id.isEmpty) return;
 
-    // Reload from server to sync
-    await getAll();
+    Map<String, dynamic> deviceJson;
+    if (_deviceResources.length == _items.length &&
+        _deviceResources[index].id?.toString() == id) {
+      deviceJson = Map<String, dynamic>.from(_deviceResources[index].toJson());
+    } else {
+       deviceJson = {
+        'resourceType': 'Device',
+        'id': id,
+      };
+    }
+
+    // Update fields
+    deviceJson['deviceName'] = [
+      {
+        'name': value['name'] ?? 'Equipment',
+        'type': 'user-friendly-name'
+      }
+    ];
+
+    final noteJson = '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
+    deviceJson['note'] = [
+      {'text': noteJson}
+    ];
+
+    final statusCode = await BackendService.updateResource(
+      deviceJson,
+      GeneralConstants.deviceResourceName,
+      id,
+    );
+
+    if (statusCode == 200 || statusCode == 201) {
+      await getAll();
+    }
   }
 
   Future<void> deleteAt(int index) async {
     if (index < 0 || index >= _items.length) return;
 
-    // TODO: Delete FHIR Device (would need Device ID from server)
-    // For now, reload data from server after local delete
-    final next = List<Map<String, String>>.from(_items)..removeAt(index);
-    _items = next;
+    final current = _items[index];
+    final id = current['id'] ?? '';
+    if (id.isEmpty) return;
 
-    // Reload from server to sync
-    await getAll();
+    final statusCode = await BackendService.deleteResource(
+      GeneralConstants.deviceResourceName,
+      id,
+    );
+
+    if (statusCode == 200 || statusCode == 204) {
+      final next = List<Map<String, String>>.from(_items)..removeAt(index);
+      _items = next;
+      await getAll();
+    }
   }
 }
 

@@ -1,44 +1,160 @@
 import 'package:flutter/material.dart';
 import '../widgets/dashboard_card.dart';
-import '../models/mock_data.dart';
+import '../services/pcr_service.dart';
 
-class PCRView extends StatelessWidget {
+class PCRView extends StatefulWidget {
   const PCRView({super.key});
 
   @override
+  State<PCRView> createState() => _PCRViewState();
+}
+
+class _PCRViewState extends State<PCRView> {
+  bool _isLoading = false;
+  Map<String, dynamic>? _pcrData;
+
+  final TextEditingController _idController = TextEditingController();
+
+  @override
+  void dispose() {
+    _idController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData({String? specificId}) async {
+    setState(() => _isLoading = true);
+    try {
+      if (specificId != null && specificId.isNotEmpty) {
+        // Load specific ID
+        try {
+          final specificReport = await PcrService.instance.getFullReportData(specificId);
+          if (specificReport.isNotEmpty && specificReport['id'] != null) {
+            setState(() => _pcrData = specificReport);
+          } else {
+             if (mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ID $specificId not found found.')));
+             }
+             // Optional: clear data or keep previous? Let's keep previous or set null
+             // setState(() => _pcrData = null); 
+          }
+        } catch (e) {
+          debugPrint('ID $specificId error: $e');
+           if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading ID $specificId: $e')));
+           }
+        }
+      } else {
+        // Load Latest
+        final reports = await PcrService.instance.getAll();
+        if (reports.isNotEmpty) {
+          final fullData = await PcrService.instance.getFullReportData(reports.first['id']);
+          setState(() => _pcrData = fullData);
+        } else {
+          setState(() => _pcrData = null);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+
+
+  @override
   Widget build(BuildContext context) {
-    // For now, show the first encounter as example
-    // Later this will come from a service/selected encounter
-    final encounter = MockData.pcrEncounters[0] as Map<String, dynamic>;
-    final pcr = encounter['pcr'] as Map<String, dynamic>;
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final encounter = _pcrData;
+    final pcr = encounter != null ? (encounter['pcr'] as Map<String, dynamic>? ?? {}) : {};
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildPatientCard(encounter['patient'] as Map<String, dynamic>),
+          // Search / Control Bar
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _idController,
+                      decoration: const InputDecoration(
+                        labelText: 'Enter PCR ID',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _loadData(specificId: _idController.text),
+                    child: const Text('Load ID'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () => _loadData(),
+                    child: const Text('Load Latest'),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
-          _buildEncounterCard(encounter['encounter'] as Map<String, dynamic>),
-          const SizedBox(height: 24),
-          _buildPCRSectionCard('A - Airway', pcr['a'] as Map<String, dynamic>),
-          const SizedBox(height: 24),
-          _buildPCRSectionCard('B - Breathing', pcr['b'] as Map<String, dynamic>),
-          const SizedBox(height: 24),
-          _buildPCRSectionCard('C - Circulation', pcr['c'] as Map<String, dynamic>),
-          const SizedBox(height: 24),
-          _buildPCRSectionCard('D - Disability', pcr['d'] as Map<String, dynamic>),
-          const SizedBox(height: 24),
-          _buildPCRSectionCard('E - Exposure', pcr['e'] as Map<String, dynamic>),
-          const SizedBox(height: 24),
-          _buildMedicationsCard(encounter['medications'] as List<dynamic>),
-          const SizedBox(height: 24),
-          _buildProceduresCard(encounter['procedures'] as List<dynamic>),
-          const SizedBox(height: 24),
-          _buildEquipmentCard(encounter['equipmentUsed'] as List<dynamic>),
-          if (encounter['handover'] != null) ...[
+
+          if (encounter == null) ...[
+             const Center(
+               child: Padding(
+                 padding: EdgeInsets.all(32.0),
+                 child: Text('No PCR data loaded. Enter an ID to view record.'),
+               ),
+             )
+          ] else ...[
+             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                 Text('ePCR Record: ${encounter['id']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
             const SizedBox(height: 24),
-            _buildHandoverCard(encounter['handover'] as Map<String, dynamic>),
+            _buildPatientCard(encounter['patient'] as Map<String, dynamic>? ?? {}),
+            const SizedBox(height: 24),
+            _buildEncounterCard(encounter['encounter'] as Map<String, dynamic>? ?? {}),
+            const SizedBox(height: 24),
+            _buildPCRSectionCard('A - Airway', pcr['a'] as Map<String, dynamic>? ?? {}),
+            const SizedBox(height: 24),
+            _buildPCRSectionCard('B - Breathing', pcr['b'] as Map<String, dynamic>? ?? {}),
+            const SizedBox(height: 24),
+            _buildPCRSectionCard('C - Circulation', pcr['c'] as Map<String, dynamic>? ?? {}),
+            const SizedBox(height: 24),
+            _buildPCRSectionCard('D - Disability', pcr['d'] as Map<String, dynamic>? ?? {}),
+            const SizedBox(height: 24),
+            _buildPCRSectionCard('E - Exposure', pcr['e'] as Map<String, dynamic>? ?? {}),
+            const SizedBox(height: 24),
+            _buildMedicationsCard(encounter['medications'] as List<dynamic>? ?? []),
+            const SizedBox(height: 24),
+            _buildProceduresCard(encounter['procedures'] as List<dynamic>? ?? []),
+            const SizedBox(height: 24),
+            _buildEquipmentCard(encounter['equipmentUsed'] as List<dynamic>? ?? []),
+            if (encounter['handover'] != null) ...[
+              const SizedBox(height: 24),
+              _buildHandoverCard(encounter['handover'] as Map<String, dynamic>),
+            ],
           ],
         ],
       ),

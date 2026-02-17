@@ -4,10 +4,13 @@ class GeneralConstants {
   static const String practitionerResourceName = 'Practitioner';
   static const String locationResourceName = 'Location';
   static const String deviceResourceName = 'Device';
-  static const String medicationResourceName = 'Medication';
   static const String encounterResourceName = 'Encounter';
   static const String observationResourceName = 'Observation';
   static const String diagnosticReportName = 'DiagnosticReport';
+  static const String serviceRequestResourceName = 'ServiceRequest';
+  static const String flagResourceName = 'Flag';
+  static const String procedureResourceName = 'Procedure';
+  static const String medicationAdministrationResourceName = 'MedicationAdministration';
 
   // FHIR URIs
   static const String patientUri = 'Patient/';
