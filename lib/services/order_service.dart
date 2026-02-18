@@ -1,4 +1,3 @@
-
 import 'package:fhir/r5.dart' as r5;
 import '../config/general_constants.dart';
 import '../config/backend_config.dart';
@@ -15,7 +14,6 @@ class OrderService {
   List<Map<String, String>> _openOrders = [];
   List<Map<String, String>> _closedOrders = [];
   List<r5.ServiceRequest> _openOrderResources = [];
-  // We might not need to keep closed resources in memory for now, just the summary list
 
   Future<List<Map<String, String>>> getOpenOrders() async {
     try {
@@ -39,7 +37,10 @@ class OrderService {
   }
 
   Future<List<r5.ServiceRequest>> _fetchServiceRequests(String status) async {
-    String? url = '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.serviceRequestResourceName}?status=$status';
+    // Include patient details if possible, but for now we just fetch the ServiceRequest
+    // and rely on the subject.display or reference.
+    String? url =
+        '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.serviceRequestResourceName}?status=$status&_sort=-authored';
     List<r5.ServiceRequest> requests = [];
     while (url != null) {
       final bundle = await BackendService.getBundle(url);
@@ -56,46 +57,86 @@ class OrderService {
   }
 
   Map<String, String> _requestToMap(r5.ServiceRequest request) {
-    String nr = request.identifier?.isNotEmpty == true
+    String displayId = request.identifier?.isNotEmpty == true
         ? request.identifier!.first.value ?? ''
         : '';
-    // ServiceRequest.code is CodeableReference, has concept (CodeableConcept) -> text
-    // ServiceRequest.note is Annotation, text is Markdown -> needs toString()
-    String title = request.code?.concept?.text ?? request.note?.firstOrNull?.text?.toString() ?? 'Order';
-    
-    // ServiceRequest.performer is List<Reference>, display is String?
-    String group = '';
+    String title =
+        request.code?.concept?.text ??
+        request.note?.firstOrNull?.text?.toString() ??
+        'Order';
+
+    String licensePlate = '';
     if (request.performer?.isNotEmpty == true) {
-      group = request.performer!.first.display ?? '';
+      licensePlate =
+          request.performer!.first.display ??
+          request.performer!.first.reference?.split('/').last ??
+          '';
     }
-        
-    // Use occurrenceDateTime or authoredOn
+
     String time = '';
     if (request.authoredOn != null) {
       final dt = request.authoredOn!.value?.toLocal();
       if (dt != null) {
-        time = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        time =
+            '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
       }
     }
 
+    // New Fields
+    String patient =
+        request.subject?.display ??
+        request.subject?.reference?.split('/').last ??
+        'Unknown';
+    String location = 'N/A';
+    if (request.location != null && request.location!.isNotEmpty) {
+      // R5 ServiceRequest.location is List<CodeableReference>
+      location =
+          request.location!.first.concept?.text ??
+          request.location!.first.reference?.display ??
+          'Unknown Loc';
+    }
+
+    // Handle potential Enum.toString() output (e.g., ServiceRequestPriority.routine -> routine)
+    String priority = request.priority?.toString().split('.').last ?? 'routine';
+
+    String reason = 'N/A';
+    if (request.reason != null && request.reason!.isNotEmpty) {
+      // R5 ServiceRequest.reason is List<CodeableReference>
+      reason =
+          request.reason!.first.concept?.text ??
+          request.reason!.first.concept?.coding?.first.display ??
+          '';
+    }
+
+    String status = request.status?.toString().split('.').last ?? 'active';
+
     return {
       'id': request.id?.toString() ?? '',
-      'nr': nr,
+      'displayId': displayId,
       'title': title,
-      'group': group,
+      'licensePlate': licensePlate,
       'time': time,
+      'patient': patient,
+      'location': location,
+      'priority': priority,
+      'reason': reason,
+      'status': status,
     };
   }
 
   Future<void> create(Map<String, String> value) async {
-    // Current time
     final now = DateTime.now();
-    // Parse time string HH:MM if provided, to update today's date
     DateTime authoredOn = now;
     if (value['time'] != null && value['time']!.contains(':')) {
       final parts = value['time']!.split(':');
       if (parts.length == 2) {
-         authoredOn = DateTime(now.year, now.month, now.day, int.parse(parts[0]), int.parse(parts[1]));
+        authoredOn = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+        );
       }
     }
 
@@ -103,21 +144,26 @@ class OrderService {
       'resourceType': 'ServiceRequest',
       'status': 'active',
       'intent': 'order',
-      'subject': {'display': 'Dashboard User'},
+      'priority': value['priority']?.toLowerCase() ?? 'routine',
+      'subject': {'display': value['patient'] ?? 'Unknown Patient'},
       'identifier': [
-        {'value': value['nr'] ?? ''}
+        {'value': value['displayId'] ?? ''},
       ],
       'code': {
-        'concept': {
-          'text': value['title'] ?? ''
-        }
+        'concept': {'text': value['title'] ?? ''},
       },
-      'performer': [
+      'reason': [
         {
-          'reference': {
-            'display': value['group'] ?? ''
-          }
-        }
+          'concept': {'text': value['reason'] ?? ''},
+        },
+      ],
+      'location': [
+        {
+          'concept': {'text': value['location'] ?? ''},
+        },
+      ],
+      'performer': [
+        {'display': value['licensePlate'] ?? ''},
       ],
       'authoredOn': authoredOn.toIso8601String(),
     };
@@ -132,7 +178,6 @@ class OrderService {
     }
   }
 
-  // Alias for DashboardPage compatibility
   Future<void> createOpenOrder(Map<String, String> value) async {
     await create(value);
   }
@@ -143,40 +188,66 @@ class OrderService {
     final id = currentMap['id'] ?? '';
     if (id.isEmpty) return;
 
-    // Retrieve original resource if possible to preserve other fields
     Map<String, dynamic> requestJson;
-    if (_openOrderResources.length == _openOrders.length && 
+    if (_openOrderResources.length == _openOrders.length &&
         _openOrderResources[index].id?.toString() == id) {
-       requestJson = Map<String, dynamic>.from(_openOrderResources[index].toJson());
+      requestJson = Map<String, dynamic>.from(
+        _openOrderResources[index].toJson(),
+      );
     } else {
-       // Minimal fallback
-       requestJson = {
-         'resourceType': 'ServiceRequest',
-         'id': id,
-         'status': 'active',
-         'intent': 'order',
-         'subject': {'display': 'Dashboard User'}
-       };
+      requestJson = {
+        'resourceType': 'ServiceRequest',
+        'id': id,
+        'status': 'active',
+        'intent': 'order',
+        'subject': {'display': 'Dashboard User'},
+      };
     }
-    
-    // Update fields
-    if (value['nr'] != null) {
-      requestJson['identifier'] = [{'value': value['nr']}];
+
+    if (value['displayId'] != null)
+      requestJson['identifier'] = [
+        {'value': value['displayId']},
+      ];
+    if (value['title'] != null)
+      requestJson['code'] = {
+        'concept': {'text': value['title']},
+      };
+    if (value['licensePlate'] != null)
+      requestJson['performer'] = [
+        {'display': value['licensePlate']},
+      ];
+    if (value['patient'] != null)
+      requestJson['subject'] = {'display': value['patient']};
+    if (value['priority'] != null)
+      requestJson['priority'] = value['priority']!.toLowerCase();
+
+    if (value['reason'] != null) {
+      requestJson['reason'] = [
+        {
+          'concept': {'text': value['reason']},
+        },
+      ];
     }
-    if (value['title'] != null) {
-      requestJson['code'] = {'concept': {'text': value['title']}};
+    if (value['location'] != null) {
+      requestJson['location'] = [
+        {
+          'concept': {'text': value['location']},
+        },
+      ];
     }
-    if (value['group'] != null) {
-      requestJson['performer'] = [{'reference': {'display': value['group']}}];
-    }
-    
-    // Time update is tricky without date, assume today
+
     if (value['time'] != null && value['time']!.contains(':')) {
       final now = DateTime.now();
       final parts = value['time']!.split(':');
       if (parts.length == 2) {
-         final dt = DateTime(now.year, now.month, now.day, int.parse(parts[0]), int.parse(parts[1]));
-         requestJson['authoredOn'] = dt.toIso8601String();
+        final dt = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+        );
+        requestJson['authoredOn'] = dt.toIso8601String();
       }
     }
 
@@ -192,25 +263,25 @@ class OrderService {
   }
 
   Future<void> acceptOpenOrder(int index) async {
-     if (index < 0 || index >= _openOrders.length) return;
-     final currentMap = _openOrders[index];
+    if (index < 0 || index >= _openOrders.length) return;
+    final currentMap = _openOrders[index];
     final id = currentMap['id'] ?? '';
     if (id.isEmpty) return;
 
-    // To "accept" (close) order, we set status to completed
-    // We can fetch the resource first to be safe or just PATCH/PUT
-    // Let's rely on updateResource with status change
-    
-    // Need full resource to PUT validly usually, or at least required fields
+    // We can just rely on updateResource with status change to completed
+    // Reuse existing resource logic from updateOpenOrder would be cleaner but let's do it quick here
+    // or better: just fetch it fresh? No, assume consistent.
+
     Map<String, dynamic> requestJson;
-    if (_openOrderResources.length == _openOrders.length && 
+    if (_openOrderResources.length == _openOrders.length &&
         _openOrderResources[index].id?.toString() == id) {
-       requestJson = Map<String, dynamic>.from(_openOrderResources[index].toJson());
+      requestJson = Map<String, dynamic>.from(
+        _openOrderResources[index].toJson(),
+      );
     } else {
-       // Fetching single resource would be safer but let's try with minimal + status
-       // Actually for PUT we need the whole thing.
-       // Let's assume list is in sync.
-       return;
+      // Risk of overwriting other fields if we use minimal json
+      // Ideally we GET first.
+      return;
     }
 
     requestJson['status'] = 'completed';
@@ -225,27 +296,5 @@ class OrderService {
       await getOpenOrders();
       await getClosedOrders();
     }
-  }
-  
-  // Method used for "closing" existing mock orders in logic
-  Future<void> close(String orderNr) async {
-    // Find ID from list
-    // This method signature is from old mock logic where we only had nr
-    // We should probably rely on index or ID.
-    // Let's implement looking up by nr locally
-    final item = _openOrders.where((o) => o['nr'] == orderNr).firstOrNull;
-    if (item != null && item['id'] != null) {
-      final index = _openOrders.indexOf(item);
-      if (index != -1) {
-         await acceptOpenOrder(index);
-      }
-    }
-  }
-
-  Future<void> reset() async {
-    _openOrders = [];
-    _closedOrders = [];
-    await getOpenOrders();
-    await getClosedOrders();
   }
 } // OrderService

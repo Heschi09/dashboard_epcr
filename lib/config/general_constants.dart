@@ -10,7 +10,8 @@ class GeneralConstants {
   static const String serviceRequestResourceName = 'ServiceRequest';
   static const String flagResourceName = 'Flag';
   static const String procedureResourceName = 'Procedure';
-  static const String medicationAdministrationResourceName = 'MedicationAdministration';
+  static const String medicationAdministrationResourceName =
+      'MedicationAdministration';
 
   // FHIR URIs
   static const String patientUri = 'Patient/';
@@ -44,7 +45,8 @@ class GeneralConstants {
   static const String medicCode = 'medic';
   static const String physicianCode = 'physician';
   static const String ambulanceCode = 'AMB';
-  static const String codeSystemRoleCode = 'http://terminology.hl7.org/CodeSystem/v3-RoleCode';
+  static const String codeSystemRoleCode =
+      'http://terminology.hl7.org/CodeSystem/v3-RoleCode';
 
   // SNOMED
   static const String snomedConceptUri = 'http://snomed.info/sct';

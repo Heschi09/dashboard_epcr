@@ -15,20 +15,21 @@ const FlutterAppAuth appAuth = FlutterAppAuth();
 const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
 class BackendService {
-
-
-
   static String? getNextPageUrl(r5.Bundle bundle) {
     String? url;
     if (bundle.link != null &&
         bundle.link!.length > 1 &&
         bundle.link!.any((l) {
-          return l.relation != null && l.relation!.value == GeneralConstants.next;
+          return l.relation != null &&
+              l.relation!.value == GeneralConstants.next;
         })) {
       url = bundle.link!
           .firstWhere((l) {
-        return l.relation != null && l.relation!.value == GeneralConstants.next;
-      }).url.toString();
+            return l.relation != null &&
+                l.relation!.value == GeneralConstants.next;
+          })
+          .url
+          .toString();
     } else {
       url = null;
     }
@@ -36,32 +37,38 @@ class BackendService {
   }
 
   static Future<int> postResourceWithAuth(
-      var fhirResource, var fhirResourceType) async {
-    final String? storedRefreshToken =
-        await secureStorage.read(key: GeneralConstants.refreshToken);
+    var fhirResource,
+    var fhirResourceType,
+  ) async {
+    final String? storedRefreshToken = await secureStorage.read(
+      key: GeneralConstants.refreshToken,
+    );
     if (storedRefreshToken == null) {
       return 401;
     }
     try {
-      final TokenResponse response = await appAuth.token(TokenRequest(
-        KeycloakConfig.clientId.value,
-        KeycloakConfig.redirectUri.value,
-        issuer: KeycloakConfig.issuer.value,
-        refreshToken: storedRefreshToken,
-        scopes: <String>[
-          GeneralConstants.openid,
-          GeneralConstants.offlineAccess
-        ],
-        allowInsecureConnections:
-            KeycloakConfig.scheme.value != GeneralConstants.https,
-      ));
+      final TokenResponse response = await appAuth.token(
+        TokenRequest(
+          KeycloakConfig.clientId.value,
+          KeycloakConfig.redirectUri.value,
+          issuer: KeycloakConfig.issuer.value,
+          refreshToken: storedRefreshToken,
+          scopes: <String>[
+            GeneralConstants.openid,
+            GeneralConstants.offlineAccess,
+          ],
+          allowInsecureConnections:
+              KeycloakConfig.scheme.value != GeneralConstants.https,
+        ),
+      );
       String accessToken = response.accessToken!;
       final http.Response responseFhir = await http.post(
         Uri.parse(BackendConfig.backendUrl.value),
         headers: <String, String>{
           GeneralConstants.authorization:
               '${GeneralConstants.bearer} $accessToken',
-          GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+          GeneralConstants.contentTypeHeader:
+              GeneralConstants.applicationJsonValue,
           GeneralConstants.xCustomEndpoint: fhirResourceType,
         },
         body: jsonEncode(fhirResource),
@@ -73,12 +80,16 @@ class BackendService {
     }
   }
 
-  static Future<int> postResource(var fhirResource, var fhirResourceType) async {
+  static Future<int> postResource(
+    var fhirResource,
+    var fhirResourceType,
+  ) async {
     try {
       final http.Response responseFhir = await http.post(
         Uri.parse('${BackendConfig.fhirBaseUrl.value}/$fhirResourceType'),
         headers: <String, String>{
-          GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+          GeneralConstants.contentTypeHeader:
+              GeneralConstants.applicationJsonValue,
           GeneralConstants.accept: GeneralConstants.applicationJsonValue,
           GeneralConstants.xCustomEndpoint: fhirResourceType,
         },
@@ -96,7 +107,8 @@ class BackendService {
       final http.Response responseFhir = await http.post(
         Uri.parse(BackendConfig.fhirBaseUrl.value),
         headers: <String, String>{
-          GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+          GeneralConstants.contentTypeHeader:
+              GeneralConstants.applicationJsonValue,
         },
         body: jsonEncode(fhirBundle),
       );
@@ -108,11 +120,15 @@ class BackendService {
   }
 
   static Future<int> updateResource(
-      var fhirResource, var fhirResourceType, String id) async {
+    var fhirResource,
+    var fhirResourceType,
+    String id,
+  ) async {
     try {
       final String? token = await _getAccessToken();
       final Map<String, String> headers = {
-        GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+        GeneralConstants.contentTypeHeader:
+            GeneralConstants.applicationJsonValue,
         GeneralConstants.accept: GeneralConstants.applicationJsonValue,
         GeneralConstants.xCustomEndpoint: fhirResourceType,
       };
@@ -126,7 +142,9 @@ class BackendService {
         headers: headers,
         body: jsonEncode(fhirResource),
       );
-      debugPrint('Update response: ${responseFhir.statusCode} ${responseFhir.body}');
+      debugPrint(
+        'Update response: ${responseFhir.statusCode} ${responseFhir.body}',
+      );
       return responseFhir.statusCode;
     } on Exception catch (e, s) {
       debugPrint('error on update resource: $e - stack: $s');
@@ -138,7 +156,8 @@ class BackendService {
     try {
       final String? token = await _getAccessToken();
       final Map<String, String> headers = {
-        GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+        GeneralConstants.contentTypeHeader:
+            GeneralConstants.applicationJsonValue,
         GeneralConstants.xCustomEndpoint: fhirResourceType,
       };
       if (token != null) {
@@ -158,24 +177,27 @@ class BackendService {
   }
 
   static Future<String?> _getAccessToken() async {
-    final String? storedRefreshToken =
-        await secureStorage.read(key: GeneralConstants.refreshToken);
+    final String? storedRefreshToken = await secureStorage.read(
+      key: GeneralConstants.refreshToken,
+    );
     if (storedRefreshToken == null) {
       return null;
     }
     try {
-      final TokenResponse? response = await appAuth.token(TokenRequest(
-        KeycloakConfig.clientId.value,
-        KeycloakConfig.redirectUri.value,
-        issuer: KeycloakConfig.issuer.value,
-        refreshToken: storedRefreshToken,
-        scopes: <String>[
-          GeneralConstants.openid,
-          GeneralConstants.offlineAccess
-        ],
-        allowInsecureConnections:
-            KeycloakConfig.scheme.value != GeneralConstants.https,
-      ));
+      final TokenResponse? response = await appAuth.token(
+        TokenRequest(
+          KeycloakConfig.clientId.value,
+          KeycloakConfig.redirectUri.value,
+          issuer: KeycloakConfig.issuer.value,
+          refreshToken: storedRefreshToken,
+          scopes: <String>[
+            GeneralConstants.openid,
+            GeneralConstants.offlineAccess,
+          ],
+          allowInsecureConnections:
+              KeycloakConfig.scheme.value != GeneralConstants.https,
+        ),
+      );
       return response?.accessToken;
     } on Exception catch (e, s) {
       debugPrint('error on refresh token: $e - stack: $s');
@@ -187,7 +209,8 @@ class BackendService {
     try {
       final String? token = await _getAccessToken();
       final Map<String, String> headers = {
-        GeneralConstants.contentTypeHeader: GeneralConstants.applicationJsonValue,
+        GeneralConstants.contentTypeHeader:
+            GeneralConstants.applicationJsonValue,
       };
       if (token != null) {
         headers[GeneralConstants.authorization] =
@@ -206,6 +229,38 @@ class BackendService {
     } on Exception catch (e, s) {
       debugPrint('error on get bundle: $e - stack: $s');
       return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getResource(
+    String resourceType,
+    String id,
+  ) async {
+    try {
+      final String? token = await _getAccessToken();
+      final Map<String, String> headers = {
+        GeneralConstants.contentTypeHeader:
+            GeneralConstants.applicationJsonValue,
+      };
+      if (token != null) {
+        headers[GeneralConstants.authorization] =
+            '${GeneralConstants.bearer} $token';
+      }
+
+      final http.Response response = await http.get(
+        Uri.parse('${BackendConfig.fhirBaseUrl.value}/$resourceType/$id'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        debugPrint('Error fetching $resourceType/$id: ${response.statusCode}');
+        return null;
+      }
+    } on Exception catch (e, s) {
+      debugPrint('Error on get resource: $e - stack: $s');
+      return null;
     }
   }
 
@@ -234,25 +289,32 @@ class BackendService {
     while (url != null) {
       final bundle = await getBundle(url);
       if (bundle.entry != null) {
-        debugPrint('Fetched ${bundle.entry!.length} location entries from server.');
+        debugPrint(
+          'Fetched ${bundle.entry!.length} location entries from server.',
+        );
         for (var entry in bundle.entry!) {
           if (entry.resource is r5.Location) {
             final location = entry.resource as r5.Location;
-            
+
             // Debugging: Print candidate location details
-            debugPrint('Checking Location: ${location.id}, Status: ${location.status}, Type: ${location.type?.map((t) => t.coding?.map((c) => c.code).toList()).toList()}');
+            debugPrint(
+              'Checking Location: ${location.id}, Status: ${location.status}, Type: ${location.type?.map((t) => t.coding?.map((c) => c.code).toList()).toList()}',
+            );
 
             // Filter for active ambulance locations
             // Fix: Compare enum directly
             final isActive = location.status == r5.LocationStatus.active;
-            
-            final isAmbulance = location.type != null &&
+
+            final isAmbulance =
+                location.type != null &&
                 location.type!.any((t) {
                   return t.coding != null &&
                       t.coding!.any((c) {
                         // Check for code 'AMB' (Ambulance)
                         // Relaxing system check slightly to avoid issues with exact URL string matches if they differ
-                        final isAmbCode = c.code != null && c.code!.value == GeneralConstants.ambulanceCode;
+                        final isAmbCode =
+                            c.code != null &&
+                            c.code!.value == GeneralConstants.ambulanceCode;
                         return isAmbCode;
                       });
                 });
@@ -260,7 +322,9 @@ class BackendService {
             if (isActive && isAmbulance) {
               locations.add(location);
             } else {
-               debugPrint('Location ${location.id} skipped. Active: $isActive, IsAmbulance: $isAmbulance');
+              debugPrint(
+                'Location ${location.id} skipped. Active: $isActive, IsAmbulance: $isAmbulance',
+              );
             }
           }
         }

@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config/backend_config.dart';
+
 import '../models/navigation_item.dart';
 import '../widgets/side_menu.dart';
 import '../views/dashboard_view.dart';
@@ -13,10 +15,11 @@ import '../dialogs/form_dialog.dart';
 import '../services/crew_service.dart';
 import '../services/vehicle_service.dart';
 import '../services/equipment_service.dart';
-import '../services/alert_service.dart';
+
 import '../services/order_service.dart';
+import '../services/pcr_service.dart';
 import '../services/backend_service.dart';
-import '../config/backend_config.dart';
+import '../services/transport_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -30,10 +33,14 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Map<String, String>> _crew = const [];
   List<Map<String, String>> _vehicles = const [];
   List<Map<String, String>> _equipment = const [];
-  List<Map<String, String>> _alerts = const [];
+  List<Map<String, String>> _transports = const [];
   List<Map<String, String>> _openOrders = const [];
   List<Map<String, String>> _closedOrders = const [];
   final List<Map<String, String>> _newOrders = [];
+
+  // Chart Data
+  // Chart Data
+  List<Map<String, dynamic>> _transportViewData = [];
 
   @override
   void initState() {
@@ -45,9 +52,7 @@ class _DashboardPageState extends State<DashboardPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     final results = <String>[];
@@ -132,18 +137,34 @@ class _DashboardPageState extends State<DashboardPage> {
       final crew = await CrewService.instance.getAll();
       final vehicles = await VehicleService.instance.getAll();
       final equipment = await EquipmentService.instance.getAll();
-      final alerts = await AlertService.instance.getAll();
+      final transports = await TransportService.instance.getAll();
       final openOrders = await OrderService.instance.getOpenOrders();
       final closedOrders = await OrderService.instance.getClosedOrders();
-      
+      final recentReports = await PcrService.instance.getRecentReports(5);
+
+      // Populate New Orders with the top 5 most recent ePCR reports
+      _newOrders.clear();
+      if (recentReports.isNotEmpty) {
+        for (var report in recentReports) {
+          _newOrders.add({
+            'patient': report['patient'] ?? 'Unknown',
+            'date': report['date'] ?? '',
+            'vehicle': report['vehicle'] ?? 'N/A',
+            'crew': report['driver'] ?? 'N/A',
+          });
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _crew = crew;
         _vehicles = vehicles;
         _equipment = equipment;
-        _alerts = alerts;
+        _transports = transports;
         _openOrders = openOrders;
         _closedOrders = closedOrders;
+        // Calculate chart data
+        _calculateChartData();
       });
     } catch (e) {
       // Set empty lists on error
@@ -152,70 +173,89 @@ class _DashboardPageState extends State<DashboardPage> {
           _crew = [];
           _vehicles = [];
           _equipment = [];
-          _alerts = [];
+          _transports = [];
           _openOrders = [];
           _closedOrders = [];
+          _openOrders = [];
+          _closedOrders = [];
+          _transportViewData = [];
         });
       }
     }
   }
 
-  Future<void> _editAlertAt(int index) async {
-    if (index < 0 || index >= _alerts.length) return;
-    final current = _alerts[index];
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (context) => FormDialog(
-        title: 'Edit Alert',
-        initialValues: current,
-        fields: const [
-          {'label': 'Number', 'hint': 'Alert number', 'key': 'nr'},
-          {'label': 'Message', 'hint': 'Enter message', 'key': 'message'},
-          {'label': 'Time', 'hint': 'HH:MM', 'key': 'time'},
-          {'label': 'Type', 'hint': 'Select type', 'key': 'type', 'type': 'dropdown', 'options': 'Info,Warn,Error'},
-        ],
-      ),
-    );
-    if (result != null) {
-      await AlertService.instance.update(index, {
-        'nr': result['nr'] ?? current['nr'] ?? '',
-        'message': result['message'] ?? current['message'] ?? '',
-        'time': result['time'] ?? current['time'] ?? '',
-        'type': result['type'] ?? current['type'] ?? 'Info',
-      });
-      final alerts = await AlertService.instance.getAll();
-      if (!mounted) return;
-      setState(() {
-        _alerts = alerts;
-      });
-    }
-  }
+  void _calculateChartData() {
+    // Prepare data for Transport Duration History Chart
+    // Filter valid transports with duration
+    final validTransports = _transports.where((t) {
+      final hasStart = t['startIso'] != null && t['startIso']!.isNotEmpty;
+      final dur = double.tryParse(t['duration'] ?? '') ?? 0;
+      return hasStart && dur > 0;
+    }).toList();
 
-  Future<void> _acceptAlertAt(int index) async {
-    if (index < 0 || index >= _alerts.length) return;
-    await AlertService.instance.deleteAt(index);
-    final alerts = await AlertService.instance.getAll();
-    if (!mounted) return;
-    setState(() {
-      _alerts = alerts;
+    // Sort chronologically (oldest to newest) for the chart
+    validTransports.sort((a, b) {
+      final dA = DateTime.tryParse(a['startIso']!) ?? DateTime(0);
+      final dB = DateTime.tryParse(b['startIso']!) ?? DateTime(0);
+      return dA.compareTo(dB);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Alert accepted')),
-    );
+
+    // Take last 20 to avoid overcrowding
+    final historyCount = 20;
+    final startIndex = validTransports.length > historyCount
+        ? validTransports.length - historyCount
+        : 0;
+    _transportViewData = validTransports.sublist(startIndex).map((t) {
+      return {
+        'patient': t['patient'] ?? 'Unknown',
+        'date': t['date'] ?? '',
+        'duration': double.tryParse(t['duration'] ?? '') ?? 0.0,
+        'status': t['status'] ?? '',
+      };
+    }).toList();
   }
 
-  void _showAlertsDialog() {
+  // Removed _editAlertAt and _acceptAlertAt as Transport is read-only for now based on plan
+  // We keep basic interaction methods if needed, or stub them
+
+  void _showTransportsDialog() {
     showDialog(
       context: context,
       builder: (context) => DetailDialog(
-        title: 'Alerts',
-        headers: const ['Number', 'Short Message', 'Time', 'Type'],
-        rows: _alerts.map((item) => [
-          item['nr']!,
-          item['message']!,
-          item['time']!,
-          item['type']!,
-        ]).toList(),
+        title: 'Transports',
+        headers: const [
+          'ID',
+          'Patient',
+          'Destination',
+          'Start',
+          'End',
+          'Status',
+          'Duration',
+        ],
+        rows: _transports.map((item) {
+          String formatTime(String? iso) {
+            if (iso == null || iso.isEmpty) return '--:--';
+            try {
+              final dt = DateTime.parse(iso).toLocal();
+              return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+            } catch (_) {
+              return '';
+            }
+          }
+
+          final start = formatTime(item['startIso']);
+          final end = formatTime(item['endIso']);
+
+          return [
+            item['id'] ?? '',
+            item['patient']!,
+            item['destination']!,
+            start,
+            end,
+            item['status']!,
+            item['time']!, // This is actually the duration string (e.g. "45 min") or "In Progress"
+          ];
+        }).toList(),
       ),
     );
   }
@@ -225,13 +265,30 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (context) => DetailDialog(
         title: 'Open Orders',
-        headers: const ['Number', 'Short Message + Type', 'Group / Vehicle', 'Time'],
-        rows: _openOrders.map((item) => [
-          item['nr']!,
-          item['title']!,
-          item['group']!,
-          item['time']!,
-        ]).toList(),
+        headers: const [
+          'ID',
+          'Title',
+          'Patient',
+          'Loc',
+          'Priority',
+          'Status',
+          'License Plate',
+          'Time',
+        ],
+        rows: _openOrders
+            .map(
+              (item) => [
+                item['displayId'] ?? '',
+                item['title'] ?? '',
+                item['patient'] ?? '',
+                item['location'] ?? '',
+                item['priority']?.toUpperCase() ?? '',
+                item['status'] ?? '',
+                item['licensePlate'] ?? '',
+                item['time'] ?? '',
+              ],
+            )
+            .toList(),
       ),
     );
   }
@@ -245,18 +302,36 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'Edit Open Order',
         initialValues: current,
         fields: const [
-          {'label': 'Number', 'hint': 'Order number', 'key': 'nr'},
+          {'label': 'ID', 'hint': 'Order ID', 'key': 'displayId'},
           {'label': 'Title', 'hint': 'Enter title', 'key': 'title'},
-          {'label': 'Group', 'hint': 'Enter group', 'key': 'group'},
+          {'label': 'Reason', 'hint': 'Specific reason', 'key': 'reason'},
+          {'label': 'Patient', 'hint': 'Patient Name', 'key': 'patient'},
+          {'label': 'Location', 'hint': 'Address/Sector', 'key': 'location'},
+          {
+            'label': 'Priority',
+            'hint': 'routine, urgent, stat',
+            'key': 'priority',
+            'type': 'dropdown',
+            'options': 'routine,urgent,asap,stat',
+          },
+          {
+            'label': 'License Plate',
+            'hint': 'Enter license plate',
+            'key': 'licensePlate',
+          },
           {'label': 'Time', 'hint': 'HH:MM', 'key': 'time'},
         ],
       ),
     );
     if (result != null) {
       await OrderService.instance.updateOpenOrder(index, {
-        'nr': result['nr'] ?? current['nr'] ?? '',
+        'displayId': result['displayId'] ?? current['displayId'] ?? '',
         'title': result['title'] ?? current['title'] ?? '',
-        'group': result['group'] ?? current['group'] ?? '',
+        'reason': result['reason'] ?? current['reason'] ?? '',
+        'patient': result['patient'] ?? current['patient'] ?? '',
+        'location': result['location'] ?? current['location'] ?? '',
+        'priority': result['priority'] ?? current['priority'] ?? 'routine',
+        'licensePlate': result['licensePlate'] ?? current['licensePlate'] ?? '',
         'time': result['time'] ?? current['time'] ?? '',
       });
       final openOrders = await OrderService.instance.getOpenOrders();
@@ -277,9 +352,9 @@ class _DashboardPageState extends State<DashboardPage> {
       _openOrders = openOrders;
       _closedOrders = closedOrders;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Order accepted by team')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Order accepted by team')));
   }
 
   void _showClosedDialog() {
@@ -287,13 +362,30 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (context) => DetailDialog(
         title: 'Closed Orders',
-        headers: const ['Number', 'Short Message + Type', 'Group / Vehicle', 'Time'],
-        rows: _closedOrders.map((item) => [
-          item['nr']!,
-          item['title']!,
-          item['group']!,
-          item['time']!,
-        ]).toList(),
+        headers: const [
+          'ID',
+          'Title',
+          'Patient',
+          'Loc',
+          'Priority',
+          'Outcome',
+          'License Plate',
+          'Time',
+        ],
+        rows: _closedOrders
+            .map(
+              (item) => [
+                item['displayId'] ?? '',
+                item['title'] ?? '',
+                item['patient'] ?? '',
+                item['location'] ?? '',
+                item['priority']?.toUpperCase() ?? '',
+                'Completed',
+                item['licensePlate'] ?? '',
+                item['time'] ?? '',
+              ],
+            )
+            .toList(),
       ),
     );
   }
@@ -307,7 +399,13 @@ class _DashboardPageState extends State<DashboardPage> {
         fields: const [
           {'label': 'Position', 'hint': 'e.g. First', 'key': 'position'},
           {'label': 'Last Name', 'hint': 'e.g. Driver', 'key': 'surname'},
-          {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Driver,Medic,Physician'},
+          {
+            'label': 'Role',
+            'hint': 'Select role',
+            'key': 'role',
+            'type': 'dropdown',
+            'options': 'Driver,Medic,Physician',
+          },
         ],
       ),
     );
@@ -334,9 +432,24 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'Register new vehicle',
         fields: [
           {'label': 'License plate', 'hint': 'e.g. RW-999', 'key': 'plate'},
-          {'label': 'Vehicle type', 'hint': 'e.g. Ambulance, Ambu-05', 'key': 'vehicle'},
-          {'label': 'Description', 'hint': 'Optional description', 'key': 'description', 'required': 'false'},
-          {'label': 'Status', 'hint': 'Select status', 'key': 'status', 'type': 'dropdown', 'options': 'Active,On Mission,Maintenance'},
+          {
+            'label': 'Vehicle type',
+            'hint': 'e.g. Ambulance, Ambu-05',
+            'key': 'vehicle',
+          },
+          {
+            'label': 'Description',
+            'hint': 'Optional description',
+            'key': 'description',
+            'required': 'false',
+          },
+          {
+            'label': 'Status',
+            'hint': 'Select status',
+            'key': 'status',
+            'type': 'dropdown',
+            'options': 'Active,On Mission,Maintenance',
+          },
         ],
       ),
     );
@@ -430,7 +543,13 @@ class _DashboardPageState extends State<DashboardPage> {
         fields: const [
           {'label': 'Position', 'hint': 'e.g. First', 'key': 'position'},
           {'label': 'Last Name', 'hint': 'e.g. Driver', 'key': 'surname'},
-          {'label': 'Role', 'hint': 'Select role', 'key': 'role', 'type': 'dropdown', 'options': 'Driver,Medic,Physician'},
+          {
+            'label': 'Role',
+            'hint': 'Select role',
+            'key': 'role',
+            'type': 'dropdown',
+            'options': 'Driver,Medic,Physician',
+          },
         ],
       ),
     );
@@ -459,7 +578,13 @@ class _DashboardPageState extends State<DashboardPage> {
         fields: const [
           {'label': 'Vehicle', 'hint': 'e.g. Ambu-05', 'key': 'vehicle'},
           {'label': 'License plate', 'hint': 'e.g. RW-999', 'key': 'plate'},
-          {'label': 'Status', 'hint': 'Select status', 'key': 'status', 'type': 'dropdown', 'options': 'Active,On Mission,Maintenance'},
+          {
+            'label': 'Status',
+            'hint': 'Select status',
+            'key': 'status',
+            'type': 'dropdown',
+            'options': 'Active,On Mission,Maintenance',
+          },
         ],
       ),
     );
@@ -533,10 +658,23 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => const FormDialog(
         title: 'New Order',
         fields: [
-          {'label': 'Number', 'hint': 'Order number', 'key': 'nr'},
-          {'label': 'Short Message + Type', 'hint': 'Enter message', 'key': 'title'},
+          {'label': 'ID', 'hint': 'Order ID', 'key': 'displayId'},
+          {'label': 'Title', 'hint': 'Enter title', 'key': 'title'},
+          {'label': 'Patient', 'hint': 'Patient Name', 'key': 'patient'},
+          {'label': 'Location', 'hint': 'Address/Sector', 'key': 'location'},
+          {
+            'label': 'Priority',
+            'hint': 'routine, urgent, stat',
+            'key': 'priority',
+            'type': 'dropdown',
+            'options': 'routine,urgent,asap,stat',
+          },
+          {
+            'label': 'License Plate',
+            'hint': 'Assigned Vehicle',
+            'key': 'licensePlate',
+          },
           {'label': 'Time', 'hint': 'HH:MM', 'key': 'time'},
-          {'label': 'Group', 'hint': 'Crew group', 'key': 'group'},
         ],
       ),
     );
@@ -544,25 +682,19 @@ class _DashboardPageState extends State<DashboardPage> {
     if (result != null) {
       // Create order
       await OrderService.instance.create({
-        'nr': result['nr'] ?? '',
+        'displayId': result['displayId'] ?? '',
         'title': result['title'] ?? '',
+        'patient': result['patient'] ?? '',
+        'location': result['location'] ?? '',
+        'priority': result['priority'] ?? 'routine',
+        'licensePlate': result['licensePlate'] ?? '',
         'time': result['time'] ?? '',
-        'group': result['group'] ?? '',
       });
 
-      // Add alert for new order
-      await AlertService.instance.addOrderAlert(
-        result['nr'] ?? '',
-        result['title'] ?? '',
-        result['time'] ?? '',
-      );
-
       // Refresh data
-      final alerts = await AlertService.instance.getAll();
       final openOrders = await OrderService.instance.getOpenOrders();
       if (!mounted) return;
       setState(() {
-        _alerts = alerts;
         _openOrders = openOrders;
       });
     }
@@ -572,14 +704,14 @@ class _DashboardPageState extends State<DashboardPage> {
     switch (_currentScreen) {
       case NavigationItem.dashboard:
         return DashboardView(
-          alerts: _alerts,
+          transports: _transports,
           openOrders: _openOrders,
           closedOrders: _closedOrders,
-          onEditAlert: _editAlertAt,
-          onAcceptAlert: _acceptAlertAt,
+          // onEditAlert: _editAlertAt,
+          // onAcceptAlert: _acceptAlertAt,
           onEditOpenOrder: _editOpenOrderAt,
           onAcceptOpenOrder: _acceptOpenOrderAt,
-          onAlertsTap: _showAlertsDialog,
+          onTransportsTap: _showTransportsDialog,
           onOpenTap: _showOpenDialog,
           onClosedTap: _showClosedDialog,
           onNewCrewTap: _showNewCrewMemberDialog,
@@ -587,8 +719,9 @@ class _DashboardPageState extends State<DashboardPage> {
           onNewEquipmentTap: _showNewEquipmentDialog,
           onNewOrderTap: _showNewOrderDialog,
           newOrders: _newOrders,
-          alertsCount: _alerts.length,
+          // alertsCount: _alerts.length,
           openOrdersCount: _openOrders.length,
+          transportViewData: _transportViewData,
         );
       case NavigationItem.pcr:
         return const PCRView();
@@ -652,9 +785,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 });
               },
             ),
-            Expanded(
-              child: _buildCurrentScreen(),
-            ),
+            Expanded(child: _buildCurrentScreen()),
           ],
         ),
       ),
