@@ -6,21 +6,26 @@ class SimpleTable extends StatelessWidget {
     required this.headers,
     required this.rows,
     this.trailingBuilder,
+    this.columnWidths,
   });
 
   final List<String> headers;
   final List<List<String>> rows;
   final Widget Function(int rowIndex)? trailingBuilder;
+  final Map<int, TableColumnWidth>? columnWidths;
 
   @override
   Widget build(BuildContext context) {
-    final effectiveHeaders = trailingBuilder != null ? [...headers, ''] : headers;
-    final columnWidths = <int, TableColumnWidth>{
-      for (var i = 0; i < effectiveHeaders.length; i++) i: const FlexColumnWidth(),
+    final effectiveHeaders = trailingBuilder != null
+        ? [...headers, '']
+        : headers;
+    final defaultColumnWidths = <int, TableColumnWidth>{
+      for (var i = 0; i < effectiveHeaders.length; i++)
+        i: const FlexColumnWidth(),
     };
 
     return Table(
-      columnWidths: columnWidths,
+      columnWidths: columnWidths ?? defaultColumnWidths,
       border: const TableBorder(
         horizontalInside: BorderSide(color: Color(0xFFECEEF3)),
       ),
@@ -30,29 +35,26 @@ class SimpleTable extends StatelessWidget {
           children: effectiveHeaders
               .map(
                 (header) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                header,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  color: Color(0xFF8B909A),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    header,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: Color(0xFF8B909A),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          )
+              )
               .toList(),
         ),
         ...rows.asMap().entries.map(
-              (entry) => TableRow(
+          (entry) => TableRow(
             children: [
               ...entry.value.map(
-                    (cell) => Padding(
+                (cell) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Text(
-                    cell,
-                    style: const TextStyle(fontSize: 13),
-                  ),
+                  child: Text(cell, style: const TextStyle(fontSize: 13)),
                 ),
               ),
               if (trailingBuilder != null)

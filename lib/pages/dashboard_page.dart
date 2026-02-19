@@ -146,9 +146,21 @@ class _DashboardPageState extends State<DashboardPage> {
       _newOrders.clear();
       if (recentReports.isNotEmpty) {
         for (var report in recentReports) {
+          String formattedDate = report['date'] ?? '';
+          try {
+            if (formattedDate.isNotEmpty) {
+              final dt = DateTime.parse(formattedDate).toLocal();
+              // Manual formatting to avoid adding intl dependency if not present
+              String twoDigits(int n) => n.toString().padLeft(2, '0');
+              formattedDate =
+                  '${twoDigits(dt.day)}.${twoDigits(dt.month)}.${dt.year} ${twoDigits(dt.hour)}:${twoDigits(dt.minute)}';
+            }
+          } catch (_) {}
+
           _newOrders.add({
+            'id': report['id'] ?? '',
             'patient': report['patient'] ?? 'Unknown',
-            'date': report['date'] ?? '',
+            'date': formattedDate,
             'vehicle': report['vehicle'] ?? 'N/A',
             'crew': report['driver'] ?? 'N/A',
           });
@@ -207,6 +219,7 @@ class _DashboardPageState extends State<DashboardPage> {
         : 0;
     _transportViewData = validTransports.sublist(startIndex).map((t) {
       return {
+        'id': t['id'] ?? 'Unknown',
         'patient': t['patient'] ?? 'Unknown',
         'date': t['date'] ?? '',
         'duration': double.tryParse(t['duration'] ?? '') ?? 0.0,
@@ -312,7 +325,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'hint': 'routine, urgent, stat',
             'key': 'priority',
             'type': 'dropdown',
-            'options': 'routine,urgent,asap,stat',
+            'options': 'Routine,High Priority,Urgent,Critical,Emergency',
           },
           {
             'label': 'License Plate',
@@ -667,7 +680,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'hint': 'routine, urgent, stat',
             'key': 'priority',
             'type': 'dropdown',
-            'options': 'routine,urgent,asap,stat',
+            'options': 'Routine,High Priority,Urgent,Critical,Emergency',
           },
           {
             'label': 'License Plate',

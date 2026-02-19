@@ -123,10 +123,20 @@ class DashboardView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           SimpleTable(
-            headers: const ['Patient', 'Date', 'Vehicle', 'Crew'],
+            headers: const ['ID', 'Patient', 'Date', 'Vehicle', 'Crew'],
+            columnWidths: const {
+              0: FixedColumnWidth(60), // ID
+              1: FlexColumnWidth(1.2), // Patient (Less space than before)
+              2: FixedColumnWidth(
+                160,
+              ), // Date (More space to push Vehicle right)
+              3: FlexColumnWidth(1), // Vehicle
+              4: FlexColumnWidth(1), // Crew
+            },
             rows: newOrders
                 .map(
                   (item) => [
+                    item['id']!,
                     item['patient']!,
                     item['date']!,
                     item['vehicle']!,
@@ -512,7 +522,7 @@ class DashboardView extends StatelessWidget {
                             if (index < 0 || index >= data.length) return null;
                             final item = data[index];
                             return BarTooltipItem(
-                              '${item['patient']}\n'
+                              '${item['id']}\n'
                               '${item['date']}\n'
                               '${rod.toY.round()} min',
                               const TextStyle(

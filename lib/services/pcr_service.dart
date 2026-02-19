@@ -448,6 +448,7 @@ class PcrService {
         }
 
         results.add({
+          'id': report.id?.toString() ?? '',
           'patient': patientText,
           'date': report.effectiveDateTime?.toString() ?? '',
           'vehicle': vehicleText,
