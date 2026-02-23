@@ -12,8 +12,6 @@ class DashboardView extends StatelessWidget {
     required this.transports,
     required this.openOrders,
     required this.closedOrders,
-    // required this.onEditAlert, // Removed
-    // required this.onAcceptAlert, // Removed
     required this.onEditOpenOrder,
     required this.onAcceptOpenOrder,
     required this.onTransportsTap,
@@ -24,7 +22,6 @@ class DashboardView extends StatelessWidget {
     required this.onNewEquipmentTap,
     required this.onNewOrderTap,
     required this.newOrders,
-    // required this.alertsCount, // Removed
     required this.openOrdersCount,
     required this.transportViewData,
   });
@@ -32,8 +29,6 @@ class DashboardView extends StatelessWidget {
   final List<Map<String, String>> transports;
   final List<Map<String, String>> openOrders;
   final List<Map<String, String>> closedOrders;
-  // final ValueChanged<int> onEditAlert;
-  // final ValueChanged<int> onAcceptAlert;
   final ValueChanged<int> onEditOpenOrder;
   final ValueChanged<int> onAcceptOpenOrder;
   final VoidCallback onTransportsTap;
@@ -44,7 +39,6 @@ class DashboardView extends StatelessWidget {
   final VoidCallback onNewEquipmentTap;
   final VoidCallback onNewOrderTap;
   final List<Map<String, String>> newOrders;
-  // final int alertsCount;
   final int openOrdersCount;
 
   final List<Map<String, dynamic>> transportViewData;
@@ -111,11 +105,11 @@ class DashboardView extends StatelessWidget {
                 value: '${closedOrders.length}',
                 onTap: onClosedTap,
               ),
-              // Removed StatChip for Avg Handling Time as data is gone
+
             ],
           ),
 
-          // ...
+
           const SizedBox(height: 24),
           const Text(
             'Latest PCR',
@@ -125,13 +119,13 @@ class DashboardView extends StatelessWidget {
           SimpleTable(
             headers: const ['ID', 'Patient', 'Date', 'Vehicle', 'Crew'],
             columnWidths: const {
-              0: FixedColumnWidth(60), // ID
-              1: FlexColumnWidth(1.2), // Patient (Less space than before)
+              0: FixedColumnWidth(60),
+              1: FlexColumnWidth(1.2),
               2: FixedColumnWidth(
                 160,
-              ), // Date (More space to push Vehicle right)
-              3: FlexColumnWidth(1), // Vehicle
-              4: FlexColumnWidth(1), // Crew
+              ),
+              3: FlexColumnWidth(1),
+              4: FlexColumnWidth(1),
             },
             rows: newOrders
                 .map(
@@ -389,7 +383,6 @@ class DashboardView extends StatelessWidget {
   Widget _buildTransportHistoryCard() {
     final data = transportViewData;
     final hasData = data.isNotEmpty;
-    // Calculate maxY for nice scaling
     double maxY = 10;
     if (hasData) {
       final maxDur = data.fold<double>(0, (m, t) => math.max(m, t['duration']));
@@ -454,12 +447,6 @@ class DashboardView extends StatelessWidget {
                               if (index < 0 || index >= data.length) {
                                 return const SizedBox.shrink();
                               }
-                              // Determine interval to avoid overlapping
-                              // e.g., if 20 items, show every 2nd or 3rd?
-                              // For now, let's show date string rotated or just index?
-                              // Showing date might be too crowded.
-                              // Let's show formatted date if we have few items,
-                              // or just a dot/index if many.
 
                               final item = data[index];
                               final dateStr = item['date'] as String;

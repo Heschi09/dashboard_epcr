@@ -1,12 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fhir/r5.dart' as r5;
 import 'package:http/http.dart' as http;
-
 import '../config/backend_config.dart';
 import '../config/keycloak_config.dart';
 import '../config/general_constants.dart';
@@ -302,7 +300,6 @@ class BackendService {
             );
 
             // Filter for active ambulance locations
-            // Fix: Compare enum directly
             final isActive = location.status == r5.LocationStatus.active;
 
             final isAmbulance =
@@ -311,7 +308,6 @@ class BackendService {
                   return t.coding != null &&
                       t.coding!.any((c) {
                         // Check for code 'AMB' (Ambulance)
-                        // Relaxing system check slightly to avoid issues with exact URL string matches if they differ
                         final isAmbCode =
                             c.code != null &&
                             c.code!.value == GeneralConstants.ambulanceCode;

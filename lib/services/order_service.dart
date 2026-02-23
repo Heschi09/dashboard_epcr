@@ -82,7 +82,7 @@ class OrderService {
       }
     }
 
-    // New Fields
+
     String patient =
         request.subject?.display ??
         request.subject?.reference?.split('/').last ??
@@ -268,9 +268,6 @@ class OrderService {
     final id = currentMap['id'] ?? '';
     if (id.isEmpty) return;
 
-    // We can just rely on updateResource with status change to completed
-    // Reuse existing resource logic from updateOpenOrder would be cleaner but let's do it quick here
-    // or better: just fetch it fresh? No, assume consistent.
 
     Map<String, dynamic> requestJson;
     if (_openOrderResources.length == _openOrders.length &&
@@ -279,8 +276,7 @@ class OrderService {
         _openOrderResources[index].toJson(),
       );
     } else {
-      // Risk of overwriting other fields if we use minimal json
-      // Ideally we GET first.
+
       return;
     }
 

@@ -137,7 +137,7 @@ class TransportService {
     String destination = 'N/A';
     String? destinationRef;
 
-    // Prefer Admission.destination (matches your server payload)
+    // Prefer Admission.destination
     final admission = json['admission'];
     if (admission is Map) {
       final dest = admission['destination'];

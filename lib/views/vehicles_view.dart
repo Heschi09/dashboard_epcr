@@ -32,7 +32,7 @@ class VehiclesView extends StatelessWidget {
           rows: vehicles.map((item) {
             return [
               item['id'] ?? '',
-              // Fallback: wenn "plate" leer ist (Mock-Daten), nimm "vehicle"
+
               item['plate']?.isNotEmpty == true
                   ? item['plate']!
                   : (item['vehicle'] ?? ''),

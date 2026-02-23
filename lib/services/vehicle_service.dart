@@ -1,5 +1,4 @@
 import 'package:fhir/r5.dart' as r5;
-
 import '../config/general_constants.dart';
 import 'backend_service.dart';
 
@@ -35,13 +34,13 @@ class VehicleService {
     // FHIR logical ID of the Location (useful for references)
     final id = location.id?.toString() ?? '';
 
-    // In deinem Beispiel ist die License Plate im "name"-Feld abgelegt
+
     final name = location.name ?? '';
 
     // Beschreibung der Ambulanz (falls vorhanden)
     final String description = location.description?.toString() ?? '';
 
-    // Status des Fahrzeugs – FHIR liefert active/suspended/inactive, UI nutzt Active/On Mission/Maintenance
+    // Status des Fahrzeugs
     final String rawStatus = location.status != null
         ? location.status.toString().split('.').last
         : 'active';
@@ -57,9 +56,7 @@ class VehicleService {
       }
     }
 
-    // Für Abwärtskompatibilität behalten wir die bisherigen Keys bei:
-    // - "vehicle": generische Fahrzeugbezeichnung
-    // - "plate": License Plate
+
     return {
       'id': id,
       'vehicle': typeDisplay.isNotEmpty ? typeDisplay : 'Ambulance',
@@ -125,7 +122,7 @@ class VehicleService {
     );
 
     if (statusCode == 200 || statusCode == 201) {
-      // Nach erfolgreichem Anlegen neu vom Server laden
+
       await getAll();
     }
   }
@@ -139,8 +136,7 @@ class VehicleService {
       return;
     }
 
-    // Ausgangspunkt ist das ursprüngliche Location-JSON,
-    // damit keine Felder verloren gehen.
+
     Map<String, dynamic> locationJson;
     if (_locationResources.length == _items.length &&
         _locationResources[index].id?.toString() == id) {
@@ -157,7 +153,7 @@ class VehicleService {
     locationJson['name'] = value['plate'] ?? '';
     locationJson['description'] = value['description'] ?? '';
 
-    // Status aus der UI (Active/On Mission/Maintenance) auf FHIR (active/suspended) mappen
+
     final status = _displayStatusToFhir(value['status'] ?? 'Active');
     locationJson['status'] = status;
 

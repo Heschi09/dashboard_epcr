@@ -1,5 +1,4 @@
 import 'package:fhir/r5.dart' as r5;
-
 import 'backend_service.dart';
 
 class CrewService {
@@ -52,7 +51,7 @@ class CrewService {
     // FHIR logical ID (useful to reference the practitioner elsewhere)
     final id = p.id?.toString() ?? '';
 
-    // Extract primary identifier value (e.g. staff number or role code)
+    // Extract primary identifier value
     String primaryIdentifier = '';
     String role = 'Paramedic';
     String group = 'A';
@@ -89,7 +88,7 @@ class CrewService {
       'id': id,
       'group': group,
       'position': position,
-      'name': position, // Keep for backward compatibility if needed, or just rely on position
+      'name': position,
       'surname': family,
       'role': role,
       'identifier': primaryIdentifier,
@@ -154,7 +153,7 @@ class CrewService {
       return;
     }
 
-    // Versuche, das originale Practitioner-JSON zu nehmen, damit keine Felder verloren gehen.
+
     Map<String, dynamic> practitionerJson;
     if (_practitionerResources.length == _items.length &&
         _practitionerResources[index].id?.toString() == id) {

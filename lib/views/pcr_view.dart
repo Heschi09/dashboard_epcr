@@ -41,8 +41,7 @@ class _PCRViewState extends State<PCRView> {
              if (mounted) {
                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ID $specificId not found found.')));
              }
-             // Optional: clear data or keep previous? Let's keep previous or set null
-             // setState(() => _pcrData = null); 
+
           }
         } catch (e) {
           debugPrint('ID $specificId error: $e');

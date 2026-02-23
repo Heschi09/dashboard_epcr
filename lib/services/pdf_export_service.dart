@@ -1,9 +1,7 @@
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import '../config/general_constants.dart';
 
 class PdfExportService {
   static const PdfColor rwandaRed = PdfColor.fromInt(0xFFCE1126); 

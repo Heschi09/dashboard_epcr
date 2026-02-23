@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/backend_config.dart';
-
 import '../models/navigation_item.dart';
 import '../widgets/side_menu.dart';
 import '../views/dashboard_view.dart';
@@ -15,7 +14,6 @@ import '../dialogs/form_dialog.dart';
 import '../services/crew_service.dart';
 import '../services/vehicle_service.dart';
 import '../services/equipment_service.dart';
-
 import '../services/order_service.dart';
 import '../services/pcr_service.dart';
 import '../services/backend_service.dart';
@@ -150,7 +148,6 @@ class _DashboardPageState extends State<DashboardPage> {
           try {
             if (formattedDate.isNotEmpty) {
               final dt = DateTime.parse(formattedDate).toLocal();
-              // Manual formatting to avoid adding intl dependency if not present
               String twoDigits(int n) => n.toString().padLeft(2, '0');
               formattedDate =
                   '${twoDigits(dt.day)}.${twoDigits(dt.month)}.${dt.year} ${twoDigits(dt.hour)}:${twoDigits(dt.minute)}';
@@ -228,8 +225,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }).toList();
   }
 
-  // Removed _editAlertAt and _acceptAlertAt as Transport is read-only for now based on plan
-  // We keep basic interaction methods if needed, or stub them
 
   void _showTransportsDialog() {
     showDialog(
@@ -266,7 +261,7 @@ class _DashboardPageState extends State<DashboardPage> {
             start,
             end,
             item['status']!,
-            item['time']!, // This is actually the duration string (e.g. "45 min") or "In Progress"
+            item['time']!,
           ];
         }).toList(),
       ),
@@ -404,7 +399,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _showNewCrewMemberDialog() async {
-    // Felder wie in Crew View: Name, Surname, Role. ID wird automatisch vom Server vergeben.
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => FormDialog(
@@ -438,7 +432,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _showNewVehicleDialog() async {
-    // Felder wie in Vehicles View: License plate, Vehicle type, Description, Status. ID wird automatisch vom Server vergeben.
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => const FormDialog(
@@ -720,8 +713,6 @@ class _DashboardPageState extends State<DashboardPage> {
           transports: _transports,
           openOrders: _openOrders,
           closedOrders: _closedOrders,
-          // onEditAlert: _editAlertAt,
-          // onAcceptAlert: _acceptAlertAt,
           onEditOpenOrder: _editOpenOrderAt,
           onAcceptOpenOrder: _acceptOpenOrderAt,
           onTransportsTap: _showTransportsDialog,
@@ -732,7 +723,6 @@ class _DashboardPageState extends State<DashboardPage> {
           onNewEquipmentTap: _showNewEquipmentDialog,
           onNewOrderTap: _showNewOrderDialog,
           newOrders: _newOrders,
-          // alertsCount: _alerts.length,
           openOrdersCount: _openOrders.length,
           transportViewData: _transportViewData,
         );

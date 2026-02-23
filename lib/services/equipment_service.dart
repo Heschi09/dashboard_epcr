@@ -1,5 +1,4 @@
 import 'package:fhir/r5.dart' as r5;
-
 import '../config/general_constants.dart';
 import 'backend_service.dart';
 
@@ -42,7 +41,7 @@ class EquipmentService {
     String qty = '0';
     String target = '0';
     
-    // ... rest unchanged ...
+
 
     // Parse qty and target from note if available
     if (device.note != null && device.note!.isNotEmpty) {
@@ -57,7 +56,6 @@ class EquipmentService {
              if (qtyMatch != null) qty = qtyMatch.group(1) ?? '0';
              if (targetMatch != null) target = targetMatch.group(1) ?? '0';
           } catch (e) {
-            // ignore
           }
         }
       }

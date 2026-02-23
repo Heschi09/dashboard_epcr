@@ -414,9 +414,7 @@ class PcrService {
         if (report.extension_ != null && report.extension_!.isNotEmpty) {
           final ref = report.extension_!.first.valueReference?.reference;
           if (ref != null) {
-            // We have a reference (e.g., Location/123), we need to fetch it to get the Name
-            // We'll do a quick separate fetch here.
-            // Optimization: Could cache these if repeated.
+
             final vehicleId = ref.split('/').last;
             try {
               // Assuming it's a Location resource based on typical setup.
