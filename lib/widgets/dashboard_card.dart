@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+/// A card widget used to display sections on the dashboard.
+/// 
+/// Includes a [title] and a [child] widget, with optional [width] and [minHeight].
 class DashboardCard extends StatelessWidget {
   const DashboardCard({
     super.key,

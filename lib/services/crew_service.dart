@@ -1,6 +1,9 @@
 import 'package:fhir/r5.dart' as r5;
 import 'backend_service.dart';
 
+/// Service for managing crew members (Practitioners in FHIR).
+/// 
+/// Handles fetching, creating, updating, and deleting crew members.
 class CrewService {
   CrewService._internal() {
     _items = [];
@@ -13,6 +16,7 @@ class CrewService {
   // Original FHIR resources kept in the same order as [_items]
   late List<r5.Practitioner> _practitionerResources;
 
+  /// Fetches all practitioners from the server and maps them to a simple map format.
   Future<List<Map<String, String>>> getAll() async {
     try {
       final practitioners = await BackendService.getAllPractitioners();
@@ -95,12 +99,14 @@ class CrewService {
     };
   }
 
+  /// Resets the local state and reloads data from the server.
   Future<void> reset() async {
      // No mock data reset anymore
      _items = [];
      await getAll();
   }
 
+  /// Creates a new crew member on the server.
   Future<void> create(Map<String, String> value) async {
     // Create FHIR Practitioner resource
     final practitioner = _mapToPractitioner(value);
@@ -144,6 +150,7 @@ class CrewService {
     }
   }
 
+  /// Updates an existing crew member's information.
   Future<void> update(int index, Map<String, String> value) async {
     if (index < 0 || index >= _items.length) return;
 
@@ -167,7 +174,7 @@ class CrewService {
     // Remove meta to avoid version conflicts
     practitionerJson.remove('meta');
 
-    // Name aktualisieren
+    // Update name
     practitionerJson['name'] = [
       {
         'given': [value['position'] ?? value['name'] ?? ''],
@@ -175,7 +182,7 @@ class CrewService {
       }
     ];
 
-    // Identifier aus der Role-Auswahl ableiten
+    // Derive identifier from role selection
     final roleCode = _roleToCode(value['role'] ?? 'Paramedic');
     final identifiers = [
       {'value': roleCode}
@@ -197,6 +204,7 @@ class CrewService {
     }
   }
 
+  /// Deletes a crew member from the server by index.
   Future<void> deleteAt(int index) async {
     if (index < 0 || index >= _items.length) return;
 
@@ -214,7 +222,7 @@ class CrewService {
     if (statusCode == 200 || statusCode == 204) {
       final next = List<Map<String, String>>.from(_items)..removeAt(index);
       _items = next;
-      // Liste aus dem Server neu laden, um konsistent zu bleiben
+      // Reload list from server to remain consistent
       await getAll();
     }
   }

@@ -2,6 +2,9 @@ import 'package:fhir/r5.dart' as r5;
 import '../config/general_constants.dart';
 import 'backend_service.dart';
 
+/// Service for managing medical equipment (Devices in FHIR).
+/// 
+/// Handles inventory tracking and CRUD operations for equipment.
 class EquipmentService {
   EquipmentService._internal() {
     _items = [];
@@ -11,6 +14,7 @@ class EquipmentService {
 
   late List<Map<String, String>> _items;
 
+  /// Fetches all devices and maps their details including quantity and target levels.
   Future<List<Map<String, String>>> getAll() async {
     try {
       final devices = await BackendService.getAllDevices();
@@ -69,11 +73,13 @@ class EquipmentService {
     };
   }
 
+  /// Resets local equipment state and reloads from server.
   Future<void> reset() async {
     _items = [];
     await getAll();
   }
 
+  /// Creates a new equipment entry (Device) on the server.
   Future<void> create(Map<String, String> value) async {
     final noteJson = '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
     
@@ -101,6 +107,7 @@ class EquipmentService {
     }
   }
 
+  /// Updates quantity or target levels for an existing piece of equipment.
   Future<void> update(int index, Map<String, String> value) async {
     if (index < 0 || index >= _items.length) return;
 
@@ -143,6 +150,7 @@ class EquipmentService {
     }
   }
 
+  /// Removes an equipment item from the server.
   Future<void> deleteAt(int index) async {
     if (index < 0 || index >= _items.length) return;
 

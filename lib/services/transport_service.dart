@@ -3,6 +3,9 @@ import '../config/general_constants.dart';
 import '../config/backend_config.dart';
 import 'backend_service.dart';
 
+/// Service for managing patient transports (Encounters in FHIR).
+/// 
+/// Handles fetching and mapping of transport history and active missions.
 class TransportService {
   TransportService._internal() {
     _transports = [];
@@ -12,6 +15,7 @@ class TransportService {
 
   List<Map<String, String>> _transports = [];
 
+  /// Fetches all transport encounters and maps them for UI display.
   Future<List<Map<String, String>>> getAll() async {
     try {
       final resources = await _fetchEncounters();
@@ -23,7 +27,7 @@ class TransportService {
   }
 
   Future<List<r5.Encounter>> _fetchEncounters() async {
-    // Fetch Encounters (Transporte), sortiert nach Datum
+    // Fetch Encounters (Transports), sorted by date
     String? url =
         '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.encounterResourceName}?_sort=-date';
     List<r5.Encounter> encounters = [];
@@ -122,7 +126,7 @@ class TransportService {
 
         duration = mins.toString();
       } else {
-        // Laufender Transport (end == null)
+        // In-progress transport (end == null)
         time = 'In Progress';
         duration = '';
         if (status == 'unknown') status = 'in-progress';

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+/// A generic table widget for displaying structured data.
+/// 
+/// Supports [headers], [rows], and an optional [trailingBuilder] for action buttons.
 class SimpleTable extends StatelessWidget {
   const SimpleTable({
     super.key,

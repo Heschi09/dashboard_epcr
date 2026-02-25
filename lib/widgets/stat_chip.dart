@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+/// A small chip used to display a single statistic on the dashboard.
+/// 
+/// Shows a [label] and a [value], and can optionally trigger [onTap].
 class StatChip extends StatelessWidget {
   const StatChip({
     super.key,

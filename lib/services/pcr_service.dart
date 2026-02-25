@@ -4,11 +4,16 @@ import '../config/general_constants.dart';
 import 'backend_service.dart';
 import 'package:fhir/r5.dart' as r5;
 
+/// Service for managing Patient Care Reports (ePCRs).
+/// 
+/// Interacts with [BackendService] to fetch and map FHIR DiagnosticReports
+/// and related clinical data.
 class PcrService {
   PcrService._internal();
 
   static final PcrService instance = PcrService._internal();
 
+  /// Fetches all DiagnosticReports and maps them to a simplified list format.
   Future<List<Map<String, dynamic>>> getAll() async {
     try {
       // Fetch DiagnosticReports (ePCRs)
@@ -64,6 +69,9 @@ class PcrService {
     };
   }
 
+  /// Fetches a complete report with all its linked resources for detailed viewing.
+  /// 
+  /// Links Observations, Procedures, Medications, and Crew to the DiagnosticReport.
   Future<Map<String, dynamic>> getFullReportData(String reportId) async {
     // Load Report and all linked resources (Observations, Procedures, Patient, Encounter)
     String url =
@@ -346,6 +354,7 @@ class PcrService {
     };
   }
 
+  /// Fetches the most recent reports with optimized detail fetching.
   Future<List<Map<String, String>>> getRecentReports(int count) async {
     try {
       // Fetch recent reports with included resources for efficiency

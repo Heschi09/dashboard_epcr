@@ -12,7 +12,12 @@ import '../config/general_constants.dart';
 const FlutterAppAuth appAuth = FlutterAppAuth();
 const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
+/// Service for handling communication with the backend FHIR server.
+/// 
+/// This class provides static methods for CRUD operations on FHIR resources
+/// including authentication handling using Keycloak.
 class BackendService {
+  /// Extracts the 'next' page URL from a FHIR [Bundle] for pagination.
   static String? getNextPageUrl(r5.Bundle bundle) {
     String? url;
     if (bundle.link != null &&
@@ -34,6 +39,9 @@ class BackendService {
     return url;
   }
 
+  /// Posts a [fhirResource] to the custom backend endpoint with authentication.
+  /// 
+  /// The [fhirResourceType] is used in the `X-Custom-Endpoint` header.
   static Future<int> postResourceWithAuth(
     var fhirResource,
     var fhirResourceType,
@@ -78,6 +86,7 @@ class BackendService {
     }
   }
 
+  /// Posts a [fhirResource] to the FHIR base URL without specific authentication headers.
   static Future<int> postResource(
     var fhirResource,
     var fhirResourceType,
@@ -100,6 +109,7 @@ class BackendService {
     }
   }
 
+  /// Posts a FHIR [Bundle] to the base FHIR server.
   static Future<int> postBundle(r5.Bundle fhirBundle) async {
     try {
       final http.Response responseFhir = await http.post(
@@ -117,6 +127,7 @@ class BackendService {
     }
   }
 
+  /// Updates an existing FHIR resource by its [id].
   static Future<int> updateResource(
     var fhirResource,
     var fhirResourceType,
@@ -150,6 +161,7 @@ class BackendService {
     }
   }
 
+  /// Deletes a FHIR resource by its [id].
   static Future<int> deleteResource(var fhirResourceType, String id) async {
     try {
       final String? token = await _getAccessToken();
@@ -203,6 +215,7 @@ class BackendService {
     }
   }
 
+  /// Fetches a FHIR [Bundle] from a given [url].
   static Future<r5.Bundle> getBundle(String url) async {
     try {
       final String? token = await _getAccessToken();
@@ -230,6 +243,7 @@ class BackendService {
     }
   }
 
+  /// Fetches a single FHIR resource by its [resourceType] and [id].
   static Future<Map<String, dynamic>?> getResource(
     String resourceType,
     String id,
@@ -262,6 +276,7 @@ class BackendService {
     }
   }
 
+  /// Fetches all Practitioners from the FHIR server, handling pagination.
   static Future<List<r5.Practitioner>> getAllPractitioners() async {
     String? url =
         '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.practitionerResourceName}';
@@ -280,6 +295,7 @@ class BackendService {
     return practitioners;
   }
 
+  /// Fetches all active Locations marked as an ambulance from the FHIR server.
   static Future<List<r5.Location>> getAllLocations() async {
     String? url =
         '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.locationResourceName}';
@@ -331,6 +347,7 @@ class BackendService {
     return locations;
   }
 
+  /// Fetches all Device resources from the FHIR server.
   static Future<List<r5.Device>> getAllDevices() async {
     String? url =
         '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.deviceResourceName}';

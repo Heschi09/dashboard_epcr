@@ -3,10 +3,17 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+/// Service for exporting Patient Care Reports (ePCRs) to PDF format.
+/// 
+/// Uses the `pdf` and `printing` packages to generate and display the document.
 class PdfExportService {
   static const PdfColor rwandaRed = PdfColor.fromInt(0xFFCE1126); 
   static const PdfColor darkGrey = PdfColor.fromInt(0xFF333333);
 
+  /// Generates a two-page PDF report from the provided [pcrData].
+  /// 
+  /// The report includes patient info, encounter details, crew, assessment (A-E),
+  /// interventions, and equipment used.
   static Future<void> exportPdf(Map<String, dynamic> pcrData) async {
     final pdf = pw.Document();
     

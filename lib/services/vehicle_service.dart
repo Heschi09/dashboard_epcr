@@ -2,6 +2,9 @@ import 'package:fhir/r5.dart' as r5;
 import '../config/general_constants.dart';
 import 'backend_service.dart';
 
+/// Service for managing ambulance vehicles (Locations in FHIR).
+/// 
+/// Handles fetching, creating, updating, and deleting vehicles.
 class VehicleService {
   VehicleService._internal() {
     _items = [];
@@ -14,6 +17,7 @@ class VehicleService {
   // Original FHIR resources kept in the same order as [_items]
   late List<r5.Location> _locationResources;
 
+  /// Fetches all ambulance locations and maps them to a simplified format.
   Future<List<Map<String, String>>> getAll() async {
     try {
       final locations = await BackendService.getAllLocations();
@@ -37,10 +41,10 @@ class VehicleService {
 
     final name = location.name ?? '';
 
-    // Beschreibung der Ambulanz (falls vorhanden)
+    // Description of the ambulance (if available)
     final String description = location.description?.toString() ?? '';
 
-    // Status des Fahrzeugs
+    // Vehicle status
     final String rawStatus = location.status != null
         ? location.status.toString().split('.').last
         : 'active';
@@ -89,13 +93,15 @@ class VehicleService {
     }
   }
 
+  /// Resets the local state and reloads data from the server.
   Future<void> reset() async {
     _items = [];
     await getAll();
   }
 
+  /// Creates a new vehicle (Location) on the server.
   Future<void> create(Map<String, String> value) async {
-    // Erzeuge eine neue FHIR-Location für das Fahrzeug.
+    // Create a new FHIR Location for the vehicle.
     final fhirStatus = _displayStatusToFhir(value['status'] ?? 'Active');
     final Map<String, dynamic> locationJson = {
       'resourceType': 'Location',
@@ -127,6 +133,7 @@ class VehicleService {
     }
   }
 
+  /// Updates an existing vehicle's details.
   Future<void> update(int index, Map<String, String> value) async {
     if (index < 0 || index >= _items.length) return;
 
@@ -157,7 +164,7 @@ class VehicleService {
     final status = _displayStatusToFhir(value['status'] ?? 'Active');
     locationJson['status'] = status;
 
-    // Typ / Fahrzeugart aktualisieren
+    // Update type / vehicle class
     final vehicleType = value['vehicle'] ?? 'Ambulance';
     locationJson['type'] = [
       {
@@ -182,6 +189,7 @@ class VehicleService {
     }
   }
 
+  /// Deletes a vehicle from the server.
   Future<void> deleteAt(int index) async {
     if (index < 0 || index >= _items.length) return;
 
