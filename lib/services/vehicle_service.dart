@@ -2,9 +2,6 @@ import 'package:fhir/r5.dart' as r5;
 import '../config/general_constants.dart';
 import 'backend_service.dart';
 
-/// Service for managing ambulance vehicles (Locations in FHIR).
-/// 
-/// Handles fetching, creating, updating, and deleting vehicles.
 class VehicleService {
   VehicleService._internal() {
     _items = [];
@@ -17,7 +14,6 @@ class VehicleService {
   // Original FHIR resources kept in the same order as [_items]
   late List<r5.Location> _locationResources;
 
-  /// Fetches all ambulance locations and maps them to a simplified format.
   Future<List<Map<String, String>>> getAll() async {
     try {
       final locations = await BackendService.getAllLocations();
@@ -50,7 +46,7 @@ class VehicleService {
         : 'active';
     final String status = _fhirStatusToDisplay(rawStatus);
 
-    // Typ / Rolle (z.B. Ambulance) aus Location.type.coding
+    // Typ / Role (Ambulance) Location.type.coding
     String typeDisplay = '';
     if (location.type != null && location.type!.isNotEmpty) {
       final coding = location.type!.first.coding?.first;
@@ -93,13 +89,11 @@ class VehicleService {
     }
   }
 
-  /// Resets the local state and reloads data from the server.
   Future<void> reset() async {
     _items = [];
     await getAll();
   }
 
-  /// Creates a new vehicle (Location) on the server.
   Future<void> create(Map<String, String> value) async {
     // Create a new FHIR Location for the vehicle.
     final fhirStatus = _displayStatusToFhir(value['status'] ?? 'Active');
@@ -133,7 +127,6 @@ class VehicleService {
     }
   }
 
-  /// Updates an existing vehicle's details.
   Future<void> update(int index, Map<String, String> value) async {
     if (index < 0 || index >= _items.length) return;
 
@@ -150,7 +143,7 @@ class VehicleService {
       locationJson =
           Map<String, dynamic>.from(_locationResources[index].toJson());
     } else {
-      // Fallback: minimale neue Ressource
+
       locationJson = {
         'resourceType': 'Location',
         'id': id,
@@ -189,7 +182,6 @@ class VehicleService {
     }
   }
 
-  /// Deletes a vehicle from the server.
   Future<void> deleteAt(int index) async {
     if (index < 0 || index >= _items.length) return;
 
