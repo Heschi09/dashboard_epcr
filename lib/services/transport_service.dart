@@ -4,7 +4,7 @@ import '../config/backend_config.dart';
 import 'backend_service.dart';
 
 /// Service for managing patient transports (Encounters in FHIR).
-/// 
+///
 /// Handles fetching and mapping of transport history and active missions.
 class TransportService {
   TransportService._internal() {
@@ -18,31 +18,56 @@ class TransportService {
   /// Fetches all transport encounters and maps them for UI display.
   Future<List<Map<String, String>>> getAll() async {
     try {
-      final resources = await _fetchEncounters();
-      _transports = resources.map((e) => _encounterToMap(e)).toList();
+      String? encounterUrl =
+          '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.encounterResourceName}?_sort=-date';
+      List<r5.Encounter> encounters = [];
+
+      while (encounterUrl != null) {
+        final bundle = await BackendService.getBundle(encounterUrl);
+        if (bundle.entry != null) {
+          for (var entry in bundle.entry!) {
+            if (entry.resource is r5.Encounter) {
+              encounters.add(entry.resource as r5.Encounter);
+            }
+          }
+        }
+        encounterUrl = BackendService.getNextPageUrl(bundle);
+      }
+
+      String? pcrUrl =
+          '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.diagnosticReportName}?_sort=-date';
+      Map<String, String> patientToPcrId = {};
+
+      while (pcrUrl != null) {
+        final bundle = await BackendService.getBundle(pcrUrl);
+        if (bundle.entry != null) {
+          for (var entry in bundle.entry!) {
+            if (entry.resource is r5.DiagnosticReport) {
+              final report = entry.resource as r5.DiagnosticReport;
+              final subjectRef = report.subject?.reference;
+              if (subjectRef != null && report.id != null) {
+                if (!patientToPcrId.containsKey(subjectRef)) {
+                  patientToPcrId[subjectRef] = report.id.toString();
+                }
+              }
+            }
+          }
+        }
+        pcrUrl = BackendService.getNextPageUrl(bundle);
+      }
+
+      _transports = encounters.map((e) {
+        final map = _encounterToMap(e);
+        final patientRef = e.subject?.reference;
+        final pcrId = patientRef != null ? patientToPcrId[patientRef] : null;
+        map['pcrId'] = pcrId ?? '';
+        return map;
+      }).toList();
+
       return _transports;
     } catch (e) {
       rethrow;
     }
-  }
-
-  Future<List<r5.Encounter>> _fetchEncounters() async {
-    // Fetch Encounters (Transports), sorted by date
-    String? url =
-        '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.encounterResourceName}?_sort=-date';
-    List<r5.Encounter> encounters = [];
-    while (url != null) {
-      final bundle = await BackendService.getBundle(url);
-      if (bundle.entry != null) {
-        for (var entry in bundle.entry!) {
-          if (entry.resource is r5.Encounter) {
-            encounters.add(entry.resource as r5.Encounter);
-          }
-        }
-      }
-      url = BackendService.getNextPageUrl(bundle);
-    }
-    return encounters;
   }
 
   Map<String, String> _encounterToMap(r5.Encounter encounter) {

@@ -4,7 +4,9 @@ import '../services/pcr_service.dart';
 import '../services/pdf_export_service.dart';
 
 class PCRView extends StatefulWidget {
-  const PCRView({super.key});
+  final String? initialPcrId;
+
+  const PCRView({super.key, this.initialPcrId});
 
   @override
   State<PCRView> createState() => _PCRViewState();
@@ -25,7 +27,12 @@ class _PCRViewState extends State<PCRView> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    if (widget.initialPcrId != null && widget.initialPcrId!.isNotEmpty) {
+      _idController.text = widget.initialPcrId!;
+      _loadData(specificId: widget.initialPcrId);
+    } else {
+      _loadData();
+    }
   }
 
   Future<void> _loadData({String? specificId}) async {
@@ -34,26 +41,33 @@ class _PCRViewState extends State<PCRView> {
       if (specificId != null && specificId.isNotEmpty) {
         // Load specific ID
         try {
-          final specificReport = await PcrService.instance.getFullReportData(specificId);
+          final specificReport = await PcrService.instance.getFullReportData(
+            specificId,
+          );
           if (specificReport.isNotEmpty && specificReport['id'] != null) {
             setState(() => _pcrData = specificReport);
           } else {
-             if (mounted) {
-               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ID $specificId not found found.')));
-             }
-
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('ID $specificId not found found.')),
+              );
+            }
           }
         } catch (e) {
           debugPrint('ID $specificId error: $e');
-           if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading ID $specificId: $e')));
-           }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error loading ID $specificId: $e')),
+            );
+          }
         }
       } else {
         // Load Latest
         final reports = await PcrService.instance.getAll();
         if (reports.isNotEmpty) {
-          final fullData = await PcrService.instance.getFullReportData(reports.first['id']);
+          final fullData = await PcrService.instance.getFullReportData(
+            reports.first['id'],
+          );
           setState(() => _pcrData = fullData);
         } else {
           setState(() => _pcrData = null);
@@ -62,14 +76,14 @@ class _PCRViewState extends State<PCRView> {
     } catch (e) {
       debugPrint('Error loading data: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +92,9 @@ class _PCRViewState extends State<PCRView> {
     }
 
     final encounter = _pcrData;
-    final pcr = encounter != null ? (encounter['pcr'] as Map<String, dynamic>? ?? {}) : {};
+    final pcr = encounter != null
+        ? (encounter['pcr'] as Map<String, dynamic>? ?? {})
+        : {};
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -113,7 +129,9 @@ class _PCRViewState extends State<PCRView> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: _pcrData != null ? () => PdfExportService.exportPdf(_pcrData!) : null,
+                    onPressed: _pcrData != null
+                        ? () => PdfExportService.exportPdf(_pcrData!)
+                        : null,
                     icon: const Icon(Icons.picture_as_pdf),
                     label: const Text('Export PDF'),
                     style: ElevatedButton.styleFrom(
@@ -128,39 +146,67 @@ class _PCRViewState extends State<PCRView> {
           const SizedBox(height: 24),
 
           if (encounter == null) ...[
-             const Center(
-               child: Padding(
-                 padding: EdgeInsets.all(32.0),
-                 child: Text('No PCR data loaded. Enter an ID to view record.'),
-               ),
-             )
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32.0),
+                child: Text('No PCR data loaded. Enter an ID to view record.'),
+              ),
+            ),
           ] else ...[
-             Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                 Text('ePCR Record: ${encounter['id']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'ePCR Record: ${encounter['id']}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             const SizedBox(height: 24),
-            _buildPatientCard(encounter['patient'] as Map<String, dynamic>? ?? {}),
+            _buildPatientCard(
+              encounter['patient'] as Map<String, dynamic>? ?? {},
+            ),
             const SizedBox(height: 24),
-            _buildEncounterCard(encounter['encounter'] as Map<String, dynamic>? ?? {}),
+            _buildEncounterCard(
+              encounter['encounter'] as Map<String, dynamic>? ?? {},
+            ),
             const SizedBox(height: 24),
-            _buildPCRSectionCard('A - Airway', pcr['a'] as Map<String, dynamic>? ?? {}),
+            _buildPCRSectionCard(
+              'A - Airway',
+              pcr['a'] as Map<String, dynamic>? ?? {},
+            ),
             const SizedBox(height: 24),
-            _buildPCRSectionCard('B - Breathing', pcr['b'] as Map<String, dynamic>? ?? {}),
+            _buildPCRSectionCard(
+              'B - Breathing',
+              pcr['b'] as Map<String, dynamic>? ?? {},
+            ),
             const SizedBox(height: 24),
-            _buildPCRSectionCard('C - Circulation', pcr['c'] as Map<String, dynamic>? ?? {}),
+            _buildPCRSectionCard(
+              'C - Circulation',
+              pcr['c'] as Map<String, dynamic>? ?? {},
+            ),
             const SizedBox(height: 24),
-            _buildPCRSectionCard('D - Disability', pcr['d'] as Map<String, dynamic>? ?? {}),
+            _buildPCRSectionCard(
+              'D - Disability',
+              pcr['d'] as Map<String, dynamic>? ?? {},
+            ),
             const SizedBox(height: 24),
-            _buildPCRSectionCard('E - Exposure', pcr['e'] as Map<String, dynamic>? ?? {}),
+            _buildPCRSectionCard(
+              'E - Exposure',
+              pcr['e'] as Map<String, dynamic>? ?? {},
+            ),
             const SizedBox(height: 24),
-            _buildMedicationsCard(encounter['medications'] as List<dynamic>? ?? []),
+            _buildMedicationsCard(
+              encounter['medications'] as List<dynamic>? ?? [],
+            ),
             const SizedBox(height: 24),
-            _buildProceduresCard(encounter['procedures'] as List<dynamic>? ?? []),
+            _buildProceduresCard(
+              encounter['procedures'] as List<dynamic>? ?? [],
+            ),
             const SizedBox(height: 24),
-            _buildEquipmentCard(encounter['equipmentUsed'] as List<dynamic>? ?? []),
+            _buildEquipmentCard(
+              encounter['equipmentUsed'] as List<dynamic>? ?? [],
+            ),
             if (encounter['handover'] != null) ...[
               const SizedBox(height: 24),
               _buildHandoverCard(encounter['handover'] as Map<String, dynamic>),
@@ -222,10 +268,12 @@ class _PCRViewState extends State<PCRView> {
             runSpacing: 16,
             children: data.entries
                 .where((entry) => entry.key != 'furtherEvaluation')
-                .map((entry) => _buildInfoItem(
-                      _formatKey(entry.key),
-                      entry.value.toString(),
-                    ))
+                .map(
+                  (entry) => _buildInfoItem(
+                    _formatKey(entry.key),
+                    entry.value.toString(),
+                  ),
+                )
                 .toList(),
           ),
           if (data['furtherEvaluation'] != null) ...[
@@ -278,10 +326,12 @@ class _PCRViewState extends State<PCRView> {
       width: double.infinity,
       child: Column(
         children: medications
-            .map((med) => _buildListItem(
-                  '${med['name']} - ${med['dose']} (${med['route']})',
-                  med['time'] != null ? 'Time: ${med['time']}' : null,
-                ))
+            .map(
+              (med) => _buildListItem(
+                '${med['name']} - ${med['dose']} (${med['route']})',
+                med['time'] != null ? 'Time: ${med['time']}' : null,
+              ),
+            )
             .toList(),
       ),
     );
@@ -304,14 +354,16 @@ class _PCRViewState extends State<PCRView> {
       width: double.infinity,
       child: Column(
         children: procedures
-            .map((proc) => _buildListItem(
-                  proc['name'],
-                  proc['time'] != null
-                      ? 'Time: ${proc['time']}${proc['location'] != null ? ' | Location: ${proc['location']}' : ''}'
-                      : proc['location'] != null
-                          ? 'Location: ${proc['location']}'
-                          : null,
-                ))
+            .map(
+              (proc) => _buildListItem(
+                proc['name'],
+                proc['time'] != null
+                    ? 'Time: ${proc['time']}${proc['location'] != null ? ' | Location: ${proc['location']}' : ''}'
+                    : proc['location'] != null
+                    ? 'Location: ${proc['location']}'
+                    : null,
+              ),
+            )
             .toList(),
       ),
     );
@@ -334,10 +386,9 @@ class _PCRViewState extends State<PCRView> {
       width: double.infinity,
       child: Column(
         children: equipment
-            .map((eq) => _buildListItem(
-                  eq['name'],
-                  'Quantity: ${eq['quantity']}',
-                ))
+            .map(
+              (eq) => _buildListItem(eq['name'], 'Quantity: ${eq['quantity']}'),
+            )
             .toList(),
       ),
     );
@@ -374,10 +425,7 @@ class _PCRViewState extends State<PCRView> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    handover['notes'],
-                    style: const TextStyle(fontSize: 13),
-                  ),
+                  Text(handover['notes'], style: const TextStyle(fontSize: 13)),
                 ],
               ),
             ),

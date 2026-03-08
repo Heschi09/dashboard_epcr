@@ -7,11 +7,13 @@ class DetailDialog extends StatelessWidget {
     required this.title,
     required this.headers,
     required this.rows,
+    this.onRowTap,
   });
 
   final String title;
   final List<String> headers;
   final List<List<String>> rows;
+  final void Function(int rowIndex)? onRowTap;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,10 @@ class DetailDialog extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -40,7 +45,11 @@ class DetailDialog extends StatelessWidget {
             const SizedBox(height: 16),
             Flexible(
               child: SingleChildScrollView(
-                child: SimpleTable(headers: headers, rows: rows),
+                child: SimpleTable(
+                  headers: headers,
+                  rows: rows,
+                  onRowTap: onRowTap,
+                ),
               ),
             ),
           ],

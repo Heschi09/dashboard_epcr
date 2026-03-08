@@ -1,9 +1,10 @@
 import 'package:fhir/r5.dart' as r5;
+import 'package:flutter/foundation.dart';
 import '../config/general_constants.dart';
 import 'backend_service.dart';
 
 /// Service for managing medical equipment (Devices in FHIR).
-/// 
+///
 /// Handles inventory tracking and CRUD operations for equipment.
 class EquipmentService {
   EquipmentService._internal() {
@@ -44,8 +45,6 @@ class EquipmentService {
 
     String qty = '0';
     String target = '0';
-    
-
 
     // Parse qty and target from note if available
     if (device.note != null && device.note!.isNotEmpty) {
@@ -54,12 +53,15 @@ class EquipmentService {
         final text = annotation.text?.toString() ?? '';
         if (text.startsWith('{') && text.contains('"qty"')) {
           try {
-             final qtyMatch = RegExp(r'"qty"\s*:\s*"([^"]+)"').firstMatch(text);
-             final targetMatch = RegExp(r'"target"\s*:\s*"([^"]+)"').firstMatch(text);
-             
-             if (qtyMatch != null) qty = qtyMatch.group(1) ?? '0';
-             if (targetMatch != null) target = targetMatch.group(1) ?? '0';
+            final qtyMatch = RegExp(r'"qty"\s*:\s*"([^"]+)"').firstMatch(text);
+            final targetMatch = RegExp(
+              r'"target"\s*:\s*"([^"]+)"',
+            ).firstMatch(text);
+
+            if (qtyMatch != null) qty = qtyMatch.group(1) ?? '0';
+            if (targetMatch != null) target = targetMatch.group(1) ?? '0';
           } catch (e) {
+            debugPrint('Error parsing device note: $e');
           }
         }
       }
@@ -81,20 +83,18 @@ class EquipmentService {
 
   /// Creates a new equipment entry (Device) on the server.
   Future<void> create(Map<String, String> value) async {
-    final noteJson = '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
-    
+    final noteJson =
+        '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
+
     final Map<String, dynamic> deviceJson = {
       'resourceType': 'Device',
       'status': 'active',
       'deviceName': [
-        {
-          'name': value['name'] ?? 'Equipment',
-          'type': 'user-friendly-name'
-        }
+        {'name': value['name'] ?? 'Equipment', 'type': 'user-friendly-name'},
       ],
       'note': [
-        {'text': noteJson}
-      ]
+        {'text': noteJson},
+      ],
     };
 
     final statusCode = await BackendService.postResource(
@@ -120,23 +120,18 @@ class EquipmentService {
         _deviceResources[index].id?.toString() == id) {
       deviceJson = Map<String, dynamic>.from(_deviceResources[index].toJson());
     } else {
-       deviceJson = {
-        'resourceType': 'Device',
-        'id': id,
-      };
+      deviceJson = {'resourceType': 'Device', 'id': id};
     }
 
     // Update fields
     deviceJson['deviceName'] = [
-      {
-        'name': value['name'] ?? 'Equipment',
-        'type': 'user-friendly-name'
-      }
+      {'name': value['name'] ?? 'Equipment', 'type': 'user-friendly-name'},
     ];
 
-    final noteJson = '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
+    final noteJson =
+        '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
     deviceJson['note'] = [
-      {'text': noteJson}
+      {'text': noteJson},
     ];
 
     final statusCode = await BackendService.updateResource(
@@ -170,4 +165,3 @@ class EquipmentService {
     }
   }
 }
-

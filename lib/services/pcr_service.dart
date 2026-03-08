@@ -5,7 +5,7 @@ import 'backend_service.dart';
 import 'package:fhir/r5.dart' as r5;
 
 /// Service for managing Patient Care Reports (ePCRs).
-/// 
+///
 /// Interacts with [BackendService] to fetch and map FHIR DiagnosticReports
 /// and related clinical data.
 class PcrService {
@@ -70,7 +70,7 @@ class PcrService {
   }
 
   /// Fetches a complete report with all its linked resources for detailed viewing.
-  /// 
+  ///
   /// Links Observations, Procedures, Medications, and Crew to the DiagnosticReport.
   Future<Map<String, dynamic>> getFullReportData(String reportId) async {
     // Load Report and all linked resources (Observations, Procedures, Patient, Encounter)
@@ -143,10 +143,51 @@ class PcrService {
 
     // Parse Data
     // Map Patient
+    String patientName = 'Unknown';
+    if (patient != null && patient.name != null && patient.name!.isNotEmpty) {
+      final nameElement = patient.name!.first;
+      if (nameElement.text != null && nameElement.text!.isNotEmpty) {
+        patientName = nameElement.text!;
+      } else {
+        final family = nameElement.family ?? '';
+        final given = nameElement.given?.join(' ') ?? '';
+        patientName = [given, family].where((s) => s.isNotEmpty).join(' ');
+        if (patientName.isEmpty) patientName = 'Unknown';
+      }
+    } else if (report.subject != null) {
+      patientName =
+          report.subject!.display ??
+          report.subject!.reference?.split('/').last ??
+          'Unknown';
+    }
+
+    String age = 'Unknown';
+    if (patient?.birthDate != null) {
+      try {
+        final bd = DateTime.parse(patient!.birthDate.toString());
+        final today = DateTime.now();
+        int a = today.year - bd.year;
+        if (today.month < bd.month ||
+            (today.month == bd.month && today.day < bd.day)) {
+          a--;
+        }
+        age = a.toString();
+      } catch (_) {}
+    }
+
+    String sex = 'Unknown';
+    if (patient?.gender != null) {
+      final g = patient!.gender.toString().split('.').last;
+      if (g.isNotEmpty) {
+        sex = g[0].toUpperCase() + g.substring(1);
+      }
+    }
+
     final patientMap = {
-      'name': patient?.name?.first.text ?? 'Unknown',
+      'name': patientName,
       'birthDate': patient?.birthDate?.toString() ?? '',
-      'gender': patient?.gender?.toString() ?? '',
+      'sex': sex,
+      'age': age,
     };
 
     // Map Crew (from Performer: Medic, Physician, Driver)
@@ -187,10 +228,79 @@ class PcrService {
     }
 
     // Map Encounter
+    if (encounter == null && patient?.id != null) {
+      try {
+        final encBundle = await BackendService.getBundle(
+          '${BackendConfig.fhirBaseUrl.value}/Encounter?subject=${patient!.id}&_sort=-date&_count=1',
+        );
+        if (encBundle.entry != null && encBundle.entry!.isNotEmpty) {
+          final firstItem = encBundle.entry!.first.resource;
+          if (firstItem is r5.Encounter) {
+            encounter = firstItem;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching fallback encounter: $e');
+      }
+    }
+
+    String status = 'unknown';
+    if (encounter?.status != null) {
+      status = encounter!.status
+          .toString()
+          .split('.')
+          .last
+          .replaceAll('_', '-');
+    }
+
+    // Infer status if missing or unknown
+    final jsonE = encounter?.toJson() ?? {};
+    final dynamic periodJson = jsonE['actualPeriod'] ?? jsonE['period'];
+
+    DateTime? parseFhirDateTime(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is String) return DateTime.tryParse(raw);
+      if (raw is Map && raw['value'] is String) {
+        return DateTime.tryParse(raw['value'] as String);
+      }
+      return DateTime.tryParse(raw.toString());
+    }
+
+    final DateTime? startUtc =
+        (periodJson is Map ? parseFhirDateTime(periodJson['start']) : null) ??
+        parseFhirDateTime(jsonE['plannedStartDate']);
+    final DateTime? endUtc =
+        (periodJson is Map ? parseFhirDateTime(periodJson['end']) : null) ??
+        parseFhirDateTime(jsonE['plannedEndDate']);
+
+    if (status == 'unknown' || status == 'null') {
+      if (endUtc != null) {
+        status = 'completed';
+      } else if (startUtc != null) {
+        status = 'in-progress';
+      } else {
+        status = 'planned';
+      }
+    }
+
+    String? startTime;
+    if (report.effectiveDateTime != null) {
+      startTime =
+          DateTime.tryParse(
+            report.effectiveDateTime.toString(),
+          )?.toLocal().toString() ??
+          report.effectiveDateTime.toString();
+    }
+
+    String? endTime;
+    if (endUtc != null) {
+      endTime = DateTime.tryParse(endUtc.toString())?.toLocal().toString();
+    }
+
     final encounterMap = {
-      'status': encounter?.status?.toString() ?? 'N/A',
-      'startTime': encounter?.actualPeriod?.start?.toString(),
-      'endTime': encounter?.actualPeriod?.end?.toString(),
+      'status': status,
+      'startTime': startTime,
+      'endTime': endTime,
       'medic': medic,
       'physician': physician,
       'driver': driver,
@@ -423,7 +533,6 @@ class PcrService {
         if (report.extension_ != null && report.extension_!.isNotEmpty) {
           final ref = report.extension_!.first.valueReference?.reference;
           if (ref != null) {
-
             final vehicleId = ref.split('/').last;
             try {
               // Assuming it's a Location resource based on typical setup.

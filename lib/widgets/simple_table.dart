@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// A generic table widget for displaying structured data.
-/// 
+///
 /// Supports [headers], [rows], and an optional [trailingBuilder] for action buttons.
 class SimpleTable extends StatelessWidget {
   const SimpleTable({
@@ -10,12 +10,14 @@ class SimpleTable extends StatelessWidget {
     required this.rows,
     this.trailingBuilder,
     this.columnWidths,
+    this.onRowTap,
   });
 
   final List<String> headers;
   final List<List<String>> rows;
   final Widget Function(int rowIndex)? trailingBuilder;
   final Map<int, TableColumnWidth>? columnWidths;
+  final void Function(int rowIndex)? onRowTap;
 
   @override
   Widget build(BuildContext context) {
@@ -55,9 +57,12 @@ class SimpleTable extends StatelessWidget {
           (entry) => TableRow(
             children: [
               ...entry.value.map(
-                (cell) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Text(cell, style: const TextStyle(fontSize: 13)),
+                (cell) => TableRowInkWell(
+                  onTap: onRowTap != null ? () => onRowTap!(entry.key) : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(cell, style: const TextStyle(fontSize: 13)),
+                  ),
                 ),
               ),
               if (trailingBuilder != null)

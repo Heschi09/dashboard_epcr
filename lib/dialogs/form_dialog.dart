@@ -30,11 +30,16 @@ class _FormDialogState extends State<FormDialog> {
       final key = field['key'] ?? field['label'] ?? 'field';
       final initial = widget.initialValues?[key] ?? '';
       _controllers.add(TextEditingController(text: initial));
-      
+
       // Initialize dropdown value if it's a dropdown field
       if (field['type'] == 'dropdown') {
-        final options = field['options']?.split(',').map((e) => e.trim()).toList() ?? [];
-        _dropdownValues.add(options.contains(initial) ? initial : (options.isNotEmpty ? options[0] : null));
+        final options =
+            field['options']?.split(',').map((e) => e.trim()).toList() ?? [];
+        _dropdownValues.add(
+          options.contains(initial)
+              ? initial
+              : (options.isNotEmpty ? options[0] : null),
+        );
       } else {
         _dropdownValues.add(null);
       }
@@ -51,7 +56,7 @@ class _FormDialogState extends State<FormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    String _keyForField(Map<String, String> field) {
+    String keyForField(Map<String, String> field) {
       return field['key'] ?? field['label'] ?? 'field';
     }
 
@@ -71,7 +76,10 @@ class _FormDialogState extends State<FormDialog> {
                 children: [
                   Text(
                     widget.title,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -83,14 +91,19 @@ class _FormDialogState extends State<FormDialog> {
               ...widget.fields.asMap().entries.map((entry) {
                 final index = entry.key;
                 final field = entry.value;
-                
+
                 // Check if this is a dropdown field
                 if (field['type'] == 'dropdown') {
-                  final options = field['options']?.split(',').map((e) => e.trim()).toList() ?? [];
+                  final options =
+                      field['options']
+                          ?.split(',')
+                          .map((e) => e.trim())
+                          .toList() ??
+                      [];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: DropdownButtonFormField<String>(
-                      value: _dropdownValues[index],
+                      initialValue: _dropdownValues[index],
                       decoration: InputDecoration(
                         labelText: field['label'],
                         hintText: field['hint'],
@@ -119,7 +132,7 @@ class _FormDialogState extends State<FormDialog> {
                     ),
                   );
                 }
-                
+
                 // Regular text field
                 final isOptional = field['required'] == 'false';
                 return Padding(
@@ -134,7 +147,8 @@ class _FormDialogState extends State<FormDialog> {
                       ),
                     ),
                     validator: (value) {
-                      if (!isOptional && (value == null || value.trim().isEmpty)) {
+                      if (!isOptional &&
+                          (value == null || value.trim().isEmpty)) {
                         return 'Required';
                       }
                       return null;
@@ -159,9 +173,10 @@ class _FormDialogState extends State<FormDialog> {
                           final field = widget.fields[i];
                           // For dropdown fields, use the dropdown value; otherwise use text controller
                           if (field['type'] == 'dropdown') {
-                            data[_keyForField(field)] = _dropdownValues[i] ?? '';
+                            data[keyForField(field)] = _dropdownValues[i] ?? '';
                           } else {
-                            data[_keyForField(field)] = _controllers[i].text.trim();
+                            data[keyForField(field)] = _controllers[i].text
+                                .trim();
                           }
                         }
                         widget.onSubmit?.call(data);

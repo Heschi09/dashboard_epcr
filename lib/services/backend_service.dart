@@ -13,7 +13,7 @@ const FlutterAppAuth appAuth = FlutterAppAuth();
 const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
 /// Service for handling communication with the backend FHIR server.
-/// 
+///
 /// This class provides static methods for CRUD operations on FHIR resources
 /// including authentication handling using Keycloak.
 class BackendService {
@@ -40,7 +40,7 @@ class BackendService {
   }
 
   /// Posts a [fhirResource] to the custom backend endpoint with authentication.
-  /// 
+  ///
   /// The [fhirResourceType] is used in the `X-Custom-Endpoint` header.
   static Future<int> postResourceWithAuth(
     var fhirResource,
@@ -194,7 +194,7 @@ class BackendService {
       return null;
     }
     try {
-      final TokenResponse? response = await appAuth.token(
+      final TokenResponse response = await appAuth.token(
         TokenRequest(
           KeycloakConfig.clientId.value,
           KeycloakConfig.redirectUri.value,
@@ -208,7 +208,7 @@ class BackendService {
               KeycloakConfig.scheme.value != GeneralConstants.https,
         ),
       );
-      return response?.accessToken;
+      return response.accessToken;
     } on Exception catch (e, s) {
       debugPrint('error on refresh token: $e - stack: $s');
       return null;

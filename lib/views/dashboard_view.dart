@@ -24,6 +24,7 @@ class DashboardView extends StatelessWidget {
     required this.newOrders,
     required this.openOrdersCount,
     required this.transportViewData,
+    this.onTransportPcrTap,
   });
 
   final List<Map<String, String>> transports;
@@ -40,6 +41,7 @@ class DashboardView extends StatelessWidget {
   final VoidCallback onNewOrderTap;
   final List<Map<String, String>> newOrders;
   final int openOrdersCount;
+  final void Function(String pcrId)? onTransportPcrTap;
 
   final List<Map<String, dynamic>> transportViewData;
 
@@ -105,10 +107,8 @@ class DashboardView extends StatelessWidget {
                 value: '${closedOrders.length}',
                 onTap: onClosedTap,
               ),
-
             ],
           ),
-
 
           const SizedBox(height: 24),
           const Text(
@@ -121,9 +121,7 @@ class DashboardView extends StatelessWidget {
             columnWidths: const {
               0: FixedColumnWidth(60),
               1: FlexColumnWidth(1.2),
-              2: FixedColumnWidth(
-                160,
-              ),
+              2: FixedColumnWidth(160),
               3: FlexColumnWidth(1),
               4: FlexColumnWidth(1),
             },
@@ -208,7 +206,9 @@ class DashboardView extends StatelessWidget {
                           color: Colors.blueAccent,
                         ),
                         title: Text(
-                          item['id'] ?? 'Unknown',
+                          item['pcrId'] != null && item['pcrId']!.isNotEmpty
+                              ? 'Transport: ${item['id']} | PCR: ${item['pcrId']}'
+                              : 'Transport: ${item['id'] ?? 'Unknown'}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
@@ -221,6 +221,13 @@ class DashboardView extends StatelessWidget {
                           ),
                           padding: EdgeInsets.zero,
                         ),
+                        onTap: () {
+                          if (item['pcrId'] != null &&
+                              item['pcrId']!.isNotEmpty &&
+                              onTransportPcrTap != null) {
+                            onTransportPcrTap!(item['pcrId']!);
+                          }
+                        },
                       ),
                     );
                   },

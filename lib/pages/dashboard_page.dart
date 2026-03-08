@@ -28,6 +28,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   NavigationItem _currentScreen = NavigationItem.dashboard;
+  String? _selectedPcrId;
   List<Map<String, String>> _crew = const [];
   List<Map<String, String>> _vehicles = const [];
   List<Map<String, String>> _equipment = const [];
@@ -225,7 +226,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }).toList();
   }
 
-
   void _showTransportsDialog() {
     showDialog(
       context: context,
@@ -233,6 +233,7 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'Transports',
         headers: const [
           'ID',
+          'PCR ID',
           'Patient',
           'Destination',
           'Start',
@@ -256,6 +257,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
           return [
             item['id'] ?? '',
+            item['pcrId'] ?? '-',
             item['patient']!,
             item['destination']!,
             start,
@@ -264,6 +266,17 @@ class _DashboardPageState extends State<DashboardPage> {
             item['time']!,
           ];
         }).toList(),
+        onRowTap: (index) {
+          final item = _transports[index];
+          final pcrId = item['pcrId'];
+          if (pcrId != null && pcrId.isNotEmpty) {
+            Navigator.of(context).pop(); // Close dialog
+            setState(() {
+              _selectedPcrId = pcrId;
+              _currentScreen = NavigationItem.pcr;
+            });
+          }
+        },
       ),
     );
   }
@@ -725,9 +738,15 @@ class _DashboardPageState extends State<DashboardPage> {
           newOrders: _newOrders,
           openOrdersCount: _openOrders.length,
           transportViewData: _transportViewData,
+          onTransportPcrTap: (String pcrId) {
+            setState(() {
+              _selectedPcrId = pcrId;
+              _currentScreen = NavigationItem.pcr;
+            });
+          },
         );
       case NavigationItem.pcr:
-        return const PCRView();
+        return PCRView(initialPcrId: _selectedPcrId);
       case NavigationItem.crew:
         return CrewView(
           crew: _crew,
@@ -763,7 +782,7 @@ class _DashboardPageState extends State<DashboardPage> {
             tooltip: 'Reload data from server',
             onPressed: () async {
               await _loadInitialData();
-              if (!mounted) return;
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Data reloaded from server')),
               );

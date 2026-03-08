@@ -75,17 +75,14 @@ class OrderService {
 
     String time = '';
     if (request.authoredOn != null) {
-      final dt = request.authoredOn!.value?.toLocal();
-      if (dt != null) {
-        time =
-            '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-      }
+      final dt = request.authoredOn!.value.toLocal();
+      time =
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     }
 
-
     String patient =
-        request.subject?.display ??
-        request.subject?.reference?.split('/').last ??
+        request.subject.display ??
+        request.subject.reference?.split('/').last ??
         'Unknown';
     String location = 'N/A';
     if (request.location != null && request.location!.isNotEmpty) {
@@ -204,22 +201,27 @@ class OrderService {
       };
     }
 
-    if (value['displayId'] != null)
+    if (value['displayId'] != null) {
       requestJson['identifier'] = [
         {'value': value['displayId']},
       ];
-    if (value['title'] != null)
+    }
+    if (value['title'] != null) {
       requestJson['code'] = {
         'concept': {'text': value['title']},
       };
-    if (value['licensePlate'] != null)
+    }
+    if (value['licensePlate'] != null) {
       requestJson['performer'] = [
         {'display': value['licensePlate']},
       ];
-    if (value['patient'] != null)
+    }
+    if (value['patient'] != null) {
       requestJson['subject'] = {'display': value['patient']};
-    if (value['priority'] != null)
+    }
+    if (value['priority'] != null) {
       requestJson['priority'] = value['priority']!.toLowerCase();
+    }
 
     if (value['reason'] != null) {
       requestJson['reason'] = [
@@ -268,7 +270,6 @@ class OrderService {
     final id = currentMap['id'] ?? '';
     if (id.isEmpty) return;
 
-
     Map<String, dynamic> requestJson;
     if (_openOrderResources.length == _openOrders.length &&
         _openOrderResources[index].id?.toString() == id) {
@@ -276,7 +277,6 @@ class OrderService {
         _openOrderResources[index].toJson(),
       );
     } else {
-
       return;
     }
 
