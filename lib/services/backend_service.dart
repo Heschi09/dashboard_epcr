@@ -236,8 +236,14 @@ class BackendService {
         debugPrint('Unauthorized access to $url');
         return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
       }
-      return r5.Bundle.fromJson(jsonDecode(response.body));
-    } on Exception catch (e, s) {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return r5.Bundle.fromJson(decoded);
+      } else {
+        debugPrint('Unexpected JSON format from $url: $decoded');
+        return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
+      }
+    } catch (e, s) {
       debugPrint('error on get bundle: $e - stack: $s');
       return r5.Bundle(type: r5.FhirCode('searchset'), entry: []);
     }
@@ -265,12 +271,18 @@ class BackendService {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final dynamic decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        } else {
+          debugPrint('Unexpected JSON format from $resourceType/$id: $decoded');
+          return null;
+        }
       } else {
         debugPrint('Error fetching $resourceType/$id: ${response.statusCode}');
         return null;
       }
-    } on Exception catch (e, s) {
+    } catch (e, s) {
       debugPrint('Error on get resource: $e - stack: $s');
       return null;
     }

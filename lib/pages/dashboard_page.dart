@@ -38,8 +38,8 @@ class _DashboardPageState extends State<DashboardPage> {
   final List<Map<String, String>> _newOrders = [];
 
   // Chart Data
-  // Chart Data
   List<Map<String, dynamic>> _transportViewData = [];
+  String? _loadError;
 
   @override
   void initState() {
@@ -175,8 +175,10 @@ class _DashboardPageState extends State<DashboardPage> {
         _closedOrders = closedOrders;
         // Calculate chart data
         _calculateChartData();
+        _loadError = null;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Error loading initial data: $e\n$stackTrace');
       // Set empty lists on error
       if (mounted) {
         setState(() {
@@ -189,6 +191,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _openOrders = [];
           _closedOrders = [];
           _transportViewData = [];
+          _loadError = '$e\n$stackTrace';
         });
       }
     }
@@ -796,20 +799,27 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
       body: SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SideMenu(
-              currentScreen: _currentScreen,
-              onItemSelected: (item) {
-                setState(() {
-                  _currentScreen = item;
-                });
-              },
-            ),
-            Expanded(child: _buildCurrentScreen()),
-          ],
-        ),
+        child: _loadError != null
+            ? Center(
+                child: Text(
+                  'Error loading data: $_loadError',
+                  style: const TextStyle(color: Colors.red, fontSize: 18),
+                ),
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SideMenu(
+                    currentScreen: _currentScreen,
+                    onItemSelected: (item) {
+                      setState(() {
+                        _currentScreen = item;
+                      });
+                    },
+                  ),
+                  Expanded(child: _buildCurrentScreen()),
+                ],
+              ),
       ),
     );
   }
