@@ -133,13 +133,23 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _loadInitialData() async {
     try {
-      final crew = await CrewService.instance.getAll();
-      final vehicles = await VehicleService.instance.getAll();
-      final equipment = await EquipmentService.instance.getAll();
-      final transports = await TransportService.instance.getAll();
-      final openOrders = await OrderService.instance.getOpenOrders();
-      final closedOrders = await OrderService.instance.getClosedOrders();
-      final recentReports = await PcrService.instance.getRecentReports(5);
+      final results = await Future.wait([
+        CrewService.instance.getAll(),
+        VehicleService.instance.getAll(),
+        EquipmentService.instance.getAll(),
+        TransportService.instance.getAll(),
+        OrderService.instance.getOpenOrders(),
+        OrderService.instance.getClosedOrders(),
+        PcrService.instance.getRecentReports(5),
+      ]);
+
+      final crew = results[0];
+      final vehicles = results[1];
+      final equipment = results[2];
+      final transports = results[3];
+      final openOrders = results[4];
+      final closedOrders = results[5];
+      final recentReports = results[6];
 
       // Populate New Orders with the top 5 most recent ePCR reports
       _newOrders.clear();
@@ -313,6 +323,27 @@ class _DashboardPageState extends State<DashboardPage> {
               ],
             )
             .toList(),
+        trailingBuilder: (index) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _editOpenOrderAt(index);
+              },
+              tooltip: 'Edit',
+            ),
+            IconButton(
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _acceptOpenOrderAt(index);
+              },
+              tooltip: 'Complete',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -498,8 +529,6 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'New Equipment',
         fields: [
           {'label': 'Name', 'hint': 'e.g. Monitor', 'key': 'name'},
-          {'label': 'Quantity', 'hint': 'e.g. 1', 'key': 'qty'},
-          {'label': 'Target Quantity', 'hint': 'e.g. 5', 'key': 'target'},
         ],
       ),
     );
@@ -507,8 +536,6 @@ class _DashboardPageState extends State<DashboardPage> {
     if (result != null) {
       await EquipmentService.instance.create({
         'name': result['name'] ?? '',
-        'qty': result['qty'] ?? '0',
-        'target': result['target'] ?? '0',
       });
       final equipment = await EquipmentService.instance.getAll();
       if (!mounted) return;
@@ -634,16 +661,12 @@ class _DashboardPageState extends State<DashboardPage> {
         initialValues: current,
         fields: const [
           {'label': 'Name', 'hint': 'e.g. Monitor', 'key': 'name'},
-          {'label': 'Quantity', 'hint': 'e.g. 1', 'key': 'qty'},
-          {'label': 'Target Quantity', 'hint': 'e.g. 5', 'key': 'target'},
         ],
       ),
     );
     if (result != null) {
       await EquipmentService.instance.update(index, {
         'name': result['name'] ?? current['name'] ?? '',
-        'qty': result['qty'] ?? current['qty'] ?? '0',
-        'target': result['target'] ?? current['target'] ?? '0',
       });
       final equipment = await EquipmentService.instance.getAll();
       if (!mounted) return;
@@ -729,8 +752,6 @@ class _DashboardPageState extends State<DashboardPage> {
           transports: _transports,
           openOrders: _openOrders,
           closedOrders: _closedOrders,
-          onEditOpenOrder: _editOpenOrderAt,
-          onAcceptOpenOrder: _acceptOpenOrderAt,
           onTransportsTap: _showTransportsDialog,
           onOpenTap: _showOpenDialog,
           onClosedTap: _showClosedDialog,

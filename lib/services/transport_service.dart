@@ -19,8 +19,9 @@ class TransportService {
   Future<List<Map<String, String>>> getAll() async {
     try {
       String? encounterUrl =
-          '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.encounterResourceName}?_sort=-date';
+          '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.encounterResourceName}?_sort=-date&_include=Encounter:subject';
       List<r5.Encounter> encounters = [];
+      Map<String, r5.Patient> patients = {};
 
       while (encounterUrl != null) {
         final bundle = await BackendService.getBundle(encounterUrl);
@@ -28,6 +29,9 @@ class TransportService {
           for (var entry in bundle.entry!) {
             if (entry.resource is r5.Encounter) {
               encounters.add(entry.resource as r5.Encounter);
+            } else if (entry.resource is r5.Patient) {
+              final p = entry.resource as r5.Patient;
+              if (p.id != null) patients[p.id.toString()] = p;
             }
           }
         }
@@ -57,7 +61,7 @@ class TransportService {
       }
 
       _transports = encounters.map((e) {
-        final map = _encounterToMap(e);
+        final map = _encounterToMapWithPatients(e, patients);
         final patientRef = e.subject?.reference;
         final pcrId = patientRef != null ? patientToPcrId[patientRef] : null;
         map['pcrId'] = pcrId ?? '';
@@ -70,7 +74,10 @@ class TransportService {
     }
   }
 
-  Map<String, String> _encounterToMap(r5.Encounter encounter) {
+  Map<String, String> _encounterToMapWithPatients(
+    r5.Encounter encounter,
+    Map<String, r5.Patient> patientsMap,
+  ) {
     String id = encounter.id?.toString() ?? '';
 
     DateTime? parseFhirDateTime(dynamic raw) {
@@ -98,10 +105,27 @@ class TransportService {
     final DateTime? end = endUtcish?.toLocal();
 
     // Patient
-    String patient =
-        encounter.subject?.display ??
-        encounter.subject?.reference?.split('/').last ??
-        'Unknown Patient';
+    String patient = 'Unknown Patient';
+    if (encounter.subject != null) {
+      final pId = encounter.subject!.reference?.split('/').last;
+      if (pId != null && patientsMap.containsKey(pId)) {
+        final p = patientsMap[pId]!;
+        String fullName = 'Unknown';
+        if (p.name != null && p.name!.isNotEmpty) {
+          final n = p.name!.first;
+          final family = n.family ?? '';
+          final given = n.given?.join(' ') ?? '';
+          final combined = [given, family].where((s) => s.isNotEmpty).join(' ');
+          fullName = combined.isNotEmpty ? combined : (n.text ?? 'Unknown');
+        }
+        patient = '$fullName ($pId)';
+      } else {
+        patient =
+            encounter.subject?.display ??
+            pId ??
+            'Unknown Patient';
+      }
+    }
 
     // Status
     String status = 'unknown';

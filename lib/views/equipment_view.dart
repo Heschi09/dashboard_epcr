@@ -22,11 +22,9 @@ class EquipmentView extends StatelessWidget {
         title: 'Equipment',
         width: double.infinity,
         child: SimpleTable(
-          headers: const ['Name', 'Quantity', 'Target Quantity'],
+          headers: const ['Name'],
           rows: equipment.map((item) => [
             item['name']!,
-            item['qty']!,
-            item['target']!,
           ]).toList(),
           trailingBuilder: (index) => Row(
             mainAxisAlignment: MainAxisAlignment.end,

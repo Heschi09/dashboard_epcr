@@ -8,12 +8,14 @@ class DetailDialog extends StatelessWidget {
     required this.headers,
     required this.rows,
     this.onRowTap,
+    this.trailingBuilder,
   });
 
   final String title;
   final List<String> headers;
   final List<List<String>> rows;
   final void Function(int rowIndex)? onRowTap;
+  final Widget Function(int rowIndex)? trailingBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +51,7 @@ class DetailDialog extends StatelessWidget {
                   headers: headers,
                   rows: rows,
                   onRowTap: onRowTap,
+                  trailingBuilder: trailingBuilder,
                 ),
               ),
             ),

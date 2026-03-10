@@ -155,8 +155,8 @@ class BackendService {
         'Update response: ${responseFhir.statusCode} ${responseFhir.body}',
       );
       return responseFhir.statusCode;
-    } on Exception catch (e, s) {
-      debugPrint('error on update resource: $e - stack: $s');
+    } on Exception catch (e) {
+      debugPrint('Error on update resource: $e');
       return 500;
     }
   }
@@ -315,17 +315,9 @@ class BackendService {
     while (url != null) {
       final bundle = await getBundle(url);
       if (bundle.entry != null) {
-        debugPrint(
-          'Fetched ${bundle.entry!.length} location entries from server.',
-        );
         for (var entry in bundle.entry!) {
           if (entry.resource is r5.Location) {
             final location = entry.resource as r5.Location;
-
-            // Debugging: Print candidate location details
-            debugPrint(
-              'Checking Location: ${location.id}, Status: ${location.status}, Type: ${location.type?.map((t) => t.coding?.map((c) => c.code).toList()).toList()}',
-            );
 
             // Filter for active ambulance locations
             final isActive = location.status == r5.LocationStatus.active;
@@ -345,24 +337,19 @@ class BackendService {
 
             if (isActive && isAmbulance) {
               locations.add(location);
-            } else {
-              debugPrint(
-                'Location ${location.id} skipped. Active: $isActive, IsAmbulance: $isAmbulance',
-              );
             }
           }
         }
       }
       url = getNextPageUrl(bundle);
     }
-    debugPrint('Returning ${locations.length} valid ambulance locations.');
     return locations;
   }
 
   /// Fetches all Device resources from the FHIR server.
   static Future<List<r5.Device>> getAllDevices() async {
     String? url =
-        '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.deviceResourceName}';
+        '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.deviceResourceName}?_count=999';
     List<r5.Device> devices = [];
     while (url != null) {
       final bundle = await getBundle(url);

@@ -7,71 +7,59 @@ import 'backend_service.dart';
 ///
 /// Handles inventory tracking and CRUD operations for equipment.
 class EquipmentService {
-  EquipmentService._internal() {
-    _items = [];
-  }
+  EquipmentService._internal();
 
   static final EquipmentService instance = EquipmentService._internal();
 
-  late List<Map<String, String>> _items;
-
-  /// Fetches all devices and maps their details including quantity and target levels.
-  Future<List<Map<String, String>>> getAll() async {
+  List<Map<String, String>> _items = [];
+  Future<List<Map<String, String>>> getAll({bool forceRefresh = false}) async {
+    if (!forceRefresh && _items.isNotEmpty) {
+      return _items;
+    }
     try {
       final devices = await BackendService.getAllDevices();
       if (devices.isEmpty) {
         _items = [];
+        _deviceResources = [];
         return [];
       }
-      _deviceResources = devices; // Store original resources
+      _deviceResources = devices;
       final serverData = devices.map((d) => _deviceToMap(d)).toList();
       _items = List<Map<String, String>>.from(serverData);
       return serverData;
     } catch (e) {
-      rethrow;
+      debugPrint('Error fetching equipment: $e');
+      return _items; // Return cache on error if available
     }
   }
 
-  // Original FHIR resources kept in the same order as [_items]
-  late List<r5.Device> _deviceResources;
+  // Original FHIR resources kept for updates
+  List<r5.Device> _deviceResources = [];
 
   Map<String, String> _deviceToMap(r5.Device device) {
     String name = 'Equipment';
-    // Use 'name' getter as per original file, assuming it maps to deviceName
-    // Use '.value' on the item, assuming it maps to the name string
-    if (device.name != null && device.name!.isNotEmpty) {
-      name = device.name!.first.value ?? '';
+    final devJson = device.toJson();
+
+    // Strategy 1: R5 name[0].value
+    if (devJson['name'] != null && devJson['name'] is List && devJson['name'].isNotEmpty) {
+      name = devJson['name'][0]['value'] ?? 'Equipment';
+    } 
+    // Strategy 2: R4/Fallback deviceName[0].name
+    else if (devJson['deviceName'] != null && devJson['deviceName'] is List && devJson['deviceName'].isNotEmpty) {
+      name = devJson['deviceName'][0]['name'] ?? 'Equipment';
     }
-
-    String qty = '0';
-    String target = '0';
-
-    // Parse qty and target from note if available
-    if (device.note != null && device.note!.isNotEmpty) {
-      // Look for a note that looks like our JSON structure
-      for (final annotation in device.note!) {
-        final text = annotation.text?.toString() ?? '';
-        if (text.startsWith('{') && text.contains('"qty"')) {
-          try {
-            final qtyMatch = RegExp(r'"qty"\s*:\s*"([^"]+)"').firstMatch(text);
-            final targetMatch = RegExp(
-              r'"target"\s*:\s*"([^"]+)"',
-            ).firstMatch(text);
-
-            if (qtyMatch != null) qty = qtyMatch.group(1) ?? '0';
-            if (targetMatch != null) target = targetMatch.group(1) ?? '0';
-          } catch (e) {
-            debugPrint('Error parsing device note: $e');
-          }
-        }
-      }
+    // Strategy 3: type.text
+    else if (device.type != null && device.type!.isNotEmpty) {
+      name = device.type!.first.text ?? device.type!.first.coding?.first.display ?? 'Equipment';
+    }
+    // Strategy 4: id fallback
+    if (name == 'Equipment' && device.id != null) {
+      name = 'Item ${device.id}';
     }
 
     return {
       'id': device.id?.toString() ?? '',
       'name': name,
-      'qty': qty,
-      'target': target,
     };
   }
 
@@ -83,17 +71,11 @@ class EquipmentService {
 
   /// Creates a new equipment entry (Device) on the server.
   Future<void> create(Map<String, String> value) async {
-    final noteJson =
-        '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
-
     final Map<String, dynamic> deviceJson = {
       'resourceType': 'Device',
       'status': 'active',
       'deviceName': [
         {'name': value['name'] ?? 'Equipment', 'type': 'user-friendly-name'},
-      ],
-      'note': [
-        {'text': noteJson},
       ],
     };
 
@@ -103,17 +85,21 @@ class EquipmentService {
     );
 
     if (statusCode == 200 || statusCode == 201) {
-      await getAll();
+      await getAll(forceRefresh: true);
     }
   }
 
   /// Updates quantity or target levels for an existing piece of equipment.
   Future<void> update(int index, Map<String, String> value) async {
-    if (index < 0 || index >= _items.length) return;
+    if (index < 0 || index >= _items.length) {
+      return;
+    }
 
     final current = _items[index];
     final id = current['id'] ?? '';
-    if (id.isEmpty) return;
+    if (id.isEmpty) {
+      return;
+    }
 
     Map<String, dynamic> deviceJson;
     if (_deviceResources.length == _items.length &&
@@ -127,12 +113,8 @@ class EquipmentService {
     deviceJson['deviceName'] = [
       {'name': value['name'] ?? 'Equipment', 'type': 'user-friendly-name'},
     ];
-
-    final noteJson =
-        '{"qty":"${value['qty'] ?? '0'}","target":"${value['target'] ?? '0'}"}';
-    deviceJson['note'] = [
-      {'text': noteJson},
-    ];
+    // Remove old note if exists
+    deviceJson.remove('note');
 
     final statusCode = await BackendService.updateResource(
       deviceJson,
@@ -141,7 +123,7 @@ class EquipmentService {
     );
 
     if (statusCode == 200 || statusCode == 201) {
-      await getAll();
+      await getAll(forceRefresh: true);
     }
   }
 

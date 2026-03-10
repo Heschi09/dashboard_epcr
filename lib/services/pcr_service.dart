@@ -117,6 +117,17 @@ class PcrService {
 
     if (report == null) return {};
 
+    // Helper to resolve a full name from a HumanName list
+    String resolveName(List<r5.HumanName>? names, String fallback) {
+      if (names == null || names.isEmpty) return fallback;
+      final name = names.first;
+      if (name.text != null && name.text!.isNotEmpty) return name.text!;
+      final family = name.family ?? '';
+      final given = name.given?.join(' ') ?? '';
+      final combined = [given, family].where((s) => s.isNotEmpty).join(' ');
+      return combined.isNotEmpty ? combined : fallback;
+    }
+
     // Helper to find Obs by ID
     r5.Observation? findObs(String? ref) {
       if (ref == null) return null;
@@ -141,24 +152,23 @@ class PcrService {
       }
     }
 
-    // Parse Data
+    // Help to find Practitioner by ID
+    String resolvePractitioner(r5.Reference? ref) {
+      if (ref == null) return 'N/A';
+      final id = ref.reference?.split('/').last;
+      try {
+        final p = practitioners.firstWhere((p) => p.id?.toString() == id);
+        return resolveName(p.name, 'N/A');
+      } catch (_) {}
+      return ref.display ?? ref.reference ?? 'N/A';
+    }
+
     // Map Patient
     String patientName = 'Unknown';
-    if (patient != null && patient.name != null && patient.name!.isNotEmpty) {
-      final nameElement = patient.name!.first;
-      if (nameElement.text != null && nameElement.text!.isNotEmpty) {
-        patientName = nameElement.text!;
-      } else {
-        final family = nameElement.family ?? '';
-        final given = nameElement.given?.join(' ') ?? '';
-        patientName = [given, family].where((s) => s.isNotEmpty).join(' ');
-        if (patientName.isEmpty) patientName = 'Unknown';
-      }
+    if (patient != null) {
+      patientName = resolveName(patient.name, 'Unknown');
     } else if (report.subject != null) {
-      patientName =
-          report.subject!.display ??
-          report.subject!.reference?.split('/').last ??
-          'Unknown';
+      patientName = report.subject!.display ?? report.subject!.reference?.split('/').last ?? 'Unknown';
     }
 
     String age = 'Unknown';
@@ -191,87 +201,260 @@ class PcrService {
     };
 
     // Map Crew (from Performer: Medic, Physician, Driver)
-    // ePCR App Order: [Medic, Physician, Driver]
     String medic = 'N/A';
     String physician = 'N/A';
     String driver = 'N/A';
 
     if (report.performer != null) {
       if (report.performer!.isNotEmpty) {
-        medic =
-            report.performer![0].display ??
-            report.performer![0].reference ??
-            'N/A';
-        // Try to resolve name from included Practitioners if possible, but display/reference is usually what's sent directly
+        medic = resolvePractitioner(report.performer![0]);
       }
       if (report.performer!.length > 1) {
-        physician =
-            report.performer![1].display ??
-            report.performer![1].reference ??
-            'N/A';
+        physician = resolvePractitioner(report.performer![1]);
       }
       if (report.performer!.length > 2) {
-        driver =
-            report.performer![2].display ??
-            report.performer![2].reference ??
-            'N/A';
+        driver = resolvePractitioner(report.performer![2]);
       }
     }
 
-    // Map Location (License Plate) from Extension
+    // --- DATA RETRIEVAL (Parallel) ---
+    r5.Encounter? resolvedEncounter = encounter;
+    List<r5.Procedure> fallbackProcedures = [];
+    List<r5.MedicationAdministration> fallbackMeds = [];
+    List<r5.BundleEntry> allUsageEntries = [];
+    List<r5.Observation> equipObs = [];
+    List<r5.Device> catalogDevices = [];
+    r5.Transport? transport;
     String licensePlate = 'N/A';
-    if (report.extension_ != null && report.extension_!.isNotEmpty) {
-      // ePCR App sends one extension with valueReference to Location
-      licensePlate =
-          report.extension_!.first.valueReference?.reference?.split('/').last ??
-          'N/A';
-    }
+    final patientId = patient?.id?.toString();
 
-    // Map Encounter
-    if (encounter == null && patient?.id != null) {
+    await Future.wait<dynamic>([
+      // 1. Encounter (if needed)
+      if (resolvedEncounter == null && patientId != null)
+        BackendService.getBundle('${BackendConfig.fhirBaseUrl.value}/Encounter?subject=$patientId&_sort=-date&_count=1')
+            .then((b) {
+          if (b.entry?.isNotEmpty ?? false) {
+            final res = b.entry!.first.resource;
+            if (res is r5.Encounter) {
+              resolvedEncounter = res;
+            }
+          }
+          return null;
+        }).catchError((e) {
+          debugPrint('Error fetching encounter: $e');
+          return null;
+        }),
+
+      // 2. Transport
+      if (patientId != null)
+        BackendService.getBundle('${BackendConfig.fhirBaseUrl.value}/Transport?for=$patientId&_sort=-date&_count=1')
+            .then((b) {
+          if (b.entry?.isNotEmpty ?? false) {
+            final res = b.entry!.first.resource;
+            if (res is r5.Transport) {
+              transport = res;
+            }
+          }
+          return null;
+        }).catchError((e) {
+          debugPrint('Error fetching transport: $e');
+          return null;
+        }),
+
+      // 3. Procedures (if empty)
+      if (procedures.isEmpty && patientId != null)
+        BackendService.getBundle('${BackendConfig.fhirBaseUrl.value}/Procedure?patient=$patientId&_sort=-date&_count=50')
+            .then((b) {
+          if (b.entry != null) {
+            for (var e in b.entry!) {
+              if (e.resource is r5.Procedure) {
+                fallbackProcedures.add(e.resource as r5.Procedure);
+              }
+            }
+          }
+          return null;
+        }).catchError((e) {
+          debugPrint('Error fetching procedures: $e');
+          return null;
+        }),
+
+      // 4. Meds (if empty)
+      if (meds.isEmpty && patientId != null)
+        BackendService.getBundle('${BackendConfig.fhirBaseUrl.value}/MedicationAdministration?patient=$patientId&_sort=-date&_count=50')
+            .then((b) {
+          if (b.entry != null) {
+            for (var e in b.entry!) {
+              if (e.resource is r5.MedicationAdministration) {
+                fallbackMeds.add(e.resource as r5.MedicationAdministration);
+              }
+            }
+          }
+          return null;
+        }).catchError((e) {
+          debugPrint('Error fetching meds: $e');
+          return null;
+        }),
+
+      // 5. DeviceUsage Pagination
+      if (patientId != null)
+        () async {
+          String? nextUrl = '${BackendConfig.fhirBaseUrl.value}/DeviceUsage?patient=$patientId&_count=100';
+          while (nextUrl != null) {
+            final bundle = await BackendService.getBundle(nextUrl);
+            if (bundle.entry != null) {
+              allUsageEntries.addAll(bundle.entry!);
+            }
+            nextUrl = BackendService.getNextPageUrl(bundle);
+          }
+        }().catchError((e) {
+          debugPrint('Error fetching device usage: $e');
+          return null;
+        }),
+
+      // 6. Observation Equip
+      if (patientId != null)
+        BackendService.getBundle('${BackendConfig.fhirBaseUrl.value}/Observation?patient=$patientId&code=246336002&_sort=-date&_count=50')
+            .then((b) {
+          if (b.entry != null) {
+            for (var e in b.entry!) {
+              if (e.resource is r5.Observation) {
+                equipObs.add(e.resource as r5.Observation);
+              }
+            }
+          }
+          return null;
+        }).catchError((e) {
+          debugPrint('Error fetching equip obs: $e');
+          return null;
+        }),
+
+      // 7. License Plate Location
+      if (report.extension_ != null && report.extension_!.isNotEmpty)
+        () async {
+          // Capture report property in a non-nullable way for the check
+          final exts = report!.extension_;
+          if (exts == null || exts.isEmpty) {
+            return;
+          }
+          final firstExt = exts.first;
+          final ref = firstExt.valueReference?.reference;
+          if (ref != null) {
+            final locId = ref.split('/').last;
+            final locJson = await BackendService.getResource('Location', locId);
+            if (locJson != null) {
+              licensePlate = locJson['name'] ?? locJson['alias']?.first ?? locId;
+            } else {
+              licensePlate = locId;
+            }
+          }
+        }().catchError((e) {
+          debugPrint('Error fetching license plate: $e');
+          return null;
+        }),
+
+      // 8. All Devices (Catalog)
+      BackendService.getAllDevices().then((list) {
+        catalogDevices = list;
+        return null;
+      }).catchError((e) {
+        debugPrint('Error fetching device catalog: $e');
+        return null;
+      }),
+    ]);
+
+    // Update aggregated lists
+    procedures.addAll(fallbackProcedures);
+    meds.addAll(fallbackMeds);
+
+    // --- PROCESSING (Synthesis) ---
+
+    // Helper for robust Location resolution
+    Future<String> resolveLocName(String? ref, {String? display}) async {
+      if (display != null &&
+          display.isNotEmpty &&
+          display.toLowerCase() != 'null') {
+        return display;
+      }
+      if (ref == null) return 'N/A';
+      final id = ref.split('/').last;
       try {
-        final encBundle = await BackendService.getBundle(
-          '${BackendConfig.fhirBaseUrl.value}/Encounter?subject=${patient!.id}&_sort=-date&_count=1',
-        );
-        if (encBundle.entry != null && encBundle.entry!.isNotEmpty) {
-          final firstItem = encBundle.entry!.first.resource;
-          if (firstItem is r5.Encounter) {
-            encounter = firstItem;
+        final locJson = await BackendService.getResource('Location', id);
+        if (locJson != null) {
+          final name =
+              locJson['name'] ??
+              locJson['address']?['text'] ??
+              locJson['alias']?.first;
+          if (name != null && name.toString().toLowerCase() != 'null') {
+            return name.toString();
           }
         }
-      } catch (e) {
-        debugPrint('Error fetching fallback encounter: $e');
+      } catch (_) {}
+      return id;
+    }
+
+    String origin = 'N/A';
+    String destination = 'N/A';
+
+    // Resolve Origin/Destination from Transport
+    if (transport != null) {
+      final tJson = transport!.toJson();
+      final currLocRef = tJson['currentLocation']?['reference'];
+      final reqLocRef = tJson['requestedLocation']?['reference'];
+      if (currLocRef != null) {
+        origin = await resolveLocName(currLocRef.toString(), display: tJson['currentLocation']?['display']);
+      }
+      if (reqLocRef != null) {
+        destination = await resolveLocName(reqLocRef.toString(), display: tJson['requestedLocation']?['display']);
+      }
+    }
+
+    // Resolve Origin/Destination Fallback (Encounter Admission)
+    final encAdm = resolvedEncounter?.toJson()['admission'];
+    if (encAdm is Map) {
+      if (origin == 'N/A' && encAdm['origin'] != null) {
+        origin = await resolveLocName(encAdm['origin']['reference']?.toString(), display: encAdm['origin']['display']?.toString());
+      }
+      if (destination == 'N/A' && encAdm['destination'] != null) {
+        destination = await resolveLocName(encAdm['destination']['reference']?.toString(), display: encAdm['destination']['display']?.toString());
+      }
+    }
+
+    // Fallback: Encounter.location
+    final locs = resolvedEncounter?.location;
+    if (destination == 'N/A' && locs != null && locs.isNotEmpty) {
+      final lastLoc = locs.last.location;
+      destination = await resolveLocName(lastLoc.reference, display: lastLoc.display);
+    }
+
+    // Map Crew & Encounter Status
+    if (report.performer != null) {
+      if (report.performer!.isNotEmpty) {
+        medic = resolvePractitioner(report.performer![0]);
+      }
+      if (report.performer!.length > 1) {
+        physician = resolvePractitioner(report.performer![1]);
+      }
+      if (report.performer!.length > 2) {
+        driver = resolvePractitioner(report.performer![2]);
       }
     }
 
     String status = 'unknown';
-    if (encounter?.status != null) {
-      status = encounter!.status
-          .toString()
-          .split('.')
-          .last
-          .replaceAll('_', '-');
+    if (resolvedEncounter?.status != null) {
+      status = resolvedEncounter!.status.toString().split('.').last.replaceAll('_', '-');
     }
 
-    // Infer status if missing or unknown
-    final jsonE = encounter?.toJson() ?? {};
-    final dynamic periodJson = jsonE['actualPeriod'] ?? jsonE['period'];
-
+    final encJson = resolvedEncounter?.toJson() ?? {};
+    final dynamic periodJson = encJson['actualPeriod'] ?? encJson['period'];
     DateTime? parseFhirDateTime(dynamic raw) {
       if (raw == null) return null;
       if (raw is String) return DateTime.tryParse(raw);
-      if (raw is Map && raw['value'] is String) {
-        return DateTime.tryParse(raw['value'] as String);
-      }
+      if (raw is Map && raw['value'] is String) return DateTime.tryParse(raw['value'] as String);
       return DateTime.tryParse(raw.toString());
     }
 
-    final DateTime? startUtc =
-        (periodJson is Map ? parseFhirDateTime(periodJson['start']) : null) ??
-        parseFhirDateTime(jsonE['plannedStartDate']);
-    final DateTime? endUtc =
-        (periodJson is Map ? parseFhirDateTime(periodJson['end']) : null) ??
-        parseFhirDateTime(jsonE['plannedEndDate']);
+    final DateTime? startUtc = (periodJson is Map ? parseFhirDateTime(periodJson['start']) : null) ?? parseFhirDateTime(encJson['plannedStartDate']);
+    final DateTime? endUtc = (periodJson is Map ? parseFhirDateTime(periodJson['end']) : null) ?? parseFhirDateTime(encJson['plannedEndDate']);
 
     if (status == 'unknown' || status == 'null') {
       if (endUtc != null) {
@@ -283,19 +466,10 @@ class PcrService {
       }
     }
 
-    String? startTime;
-    if (report.effectiveDateTime != null) {
-      startTime =
-          DateTime.tryParse(
-            report.effectiveDateTime.toString(),
-          )?.toLocal().toString() ??
-          report.effectiveDateTime.toString();
-    }
-
-    String? endTime;
-    if (endUtc != null) {
-      endTime = DateTime.tryParse(endUtc.toString())?.toLocal().toString();
-    }
+    String? startTime = report.effectiveDateTime != null 
+        ? (DateTime.tryParse(report.effectiveDateTime.toString())?.toLocal().toString() ?? report.effectiveDateTime.toString())
+        : null;
+    String? endTime = endUtc != null ? DateTime.tryParse(endUtc.toString())?.toLocal().toString() : null;
 
     final encounterMap = {
       'status': status,
@@ -305,150 +479,252 @@ class PcrService {
       'physician': physician,
       'driver': driver,
       'licensePlate': licensePlate,
-      'vehicle': 'Ambulance', // Default or fetch if needed
+      'vehicle': 'Ambulance',
+      'origin': origin,
+      'destination': destination,
     };
 
-    // Parse Sections form Observations
-    // ePCR App Order: result[0]=A, [1]=B, [2]=C, [3]=D, [4]=E
-    final sections = <String, Map<String, dynamic>>{
-      'a': {},
-      'b': {},
-      'c': {},
-      'd': {},
-      'e': {},
-    };
+    // Parse Sections from Observations
+    final sections = <String, Map<String, dynamic>>{'a': {}, 'b': {}, 'c': {}, 'd': {}, 'e': {}};
+    String getObsValue(r5.Observation obs) {
+      if (obs.valueString != null) return obs.valueString!;
+      if (obs.valueBoolean != null) return obs.valueBoolean.toString();
+      if (obs.valueQuantity != null) return obs.valueQuantity!.value?.toString() ?? '';
+      if (obs.valueInteger != null) return obs.valueInteger!.toString();
+      if (obs.valueCodeableConcept != null) {
+        return obs.valueCodeableConcept!.text ?? obs.valueCodeableConcept!.coding?.first.display ?? '';
+      }
+      return '';
+    }
 
-    void parseSection(String sectionKey, r5.Reference? ref) {
-      if (ref == null) return;
-      final sectionObs = findObs(ref.reference);
-      if (sectionObs == null || sectionObs.id?.toString() == 'missing') return;
+    void extractObsData(r5.Observation obs, Map<String, dynamic> currentTarget) {
+      final title = obs.code.text ?? obs.code.coding?.first.display ?? 'Observation';
+      final t = title.toLowerCase();
 
-      // 1. Members (Findings)
-      if (sectionObs.hasMember != null) {
-        for (var memberRef in sectionObs.hasMember!) {
+      // Redirect temperature-related data to Exposure section (Section E)
+      Map<String, dynamic> target = currentTarget;
+      if (t.contains('temperature')) {
+        target = sections['e']!;
+      }
+
+      final val = getObsValue(obs);
+      if (val.isNotEmpty) target[title] = val;
+      if (obs.component != null) {
+        for (var comp in obs.component!) {
+          final cKey = comp.code.text ?? comp.code.coding?.first.display ?? 'Info';
+          final cVal = comp.valueString ?? comp.valueQuantity?.value?.toString() ?? comp.valueInteger?.toString() ?? comp.valueCodeableConcept?.text ?? comp.valueCodeableConcept?.coding?.first.display ?? '';
+          if (cVal.isNotEmpty) target['$title - $cKey'] = cVal;
+        }
+      }
+      if (obs.hasMember != null) {
+        for (var memberRef in obs.hasMember!) {
           final memberObs = findObs(memberRef.reference);
           if (memberObs != null && memberObs.id.toString() != 'missing') {
-            final key =
-                memberObs.code.text ??
-                memberObs.code.coding?.first.display ??
-                'Observation';
-            final val =
-                memberObs.valueString ??
-                memberObs.valueBoolean?.toString() ??
-                memberObs.valueQuantity?.value?.toString() ??
-                '';
-            sections[sectionKey]![key] = val;
+            extractObsData(memberObs, target);
           }
         }
-      }
-      // 2. PartOf (Procedures)
-      if (sectionObs.partOf != null) {
-        for (var partRef in sectionObs.partOf!) {
-          if (partRef.reference?.contains('Procedure') ?? false) {
-            final proc = findProc(partRef.reference);
-            if (proc != null) {
-              final key =
-                  proc.code?.text ??
-                  proc.code?.coding?.first.display ??
-                  'Procedure';
-              sections[sectionKey]![key] = 'Performed';
-            }
-          }
-        }
-      }
-      // 3. Value of section itself
-      if (sectionObs.valueString != null) {
-        sections[sectionKey]!['Main'] = sectionObs.valueString;
       }
     }
 
     if (report.result != null) {
-      if (report.result!.isNotEmpty) parseSection('a', report.result![0]);
-      if (report.result!.length > 1) parseSection('b', report.result![1]);
-      if (report.result!.length > 2) parseSection('c', report.result![2]);
-      if (report.result!.length > 3) parseSection('d', report.result![3]);
-      if (report.result!.length > 4) parseSection('e', report.result![4]);
-    }
+      for (var i = 0; i < report.result!.length; i++) {
+        final ref = report.result![i];
+        final obs = findObs(ref.reference);
+        if (obs == null || obs.id?.toString() == 'missing') continue;
 
-    // Meds and Procedures (aggregated from all lists)
-    List<Map<String, String>> medList = meds
-        .map(
-          (m) => {
-            'name': m.medication.concept?.text ?? 'Unknown Drug',
-            'dose': m.dosage?.dose?.value?.toString() ?? '',
-            'route': m.dosage?.route?.text ?? '',
-            'time': m.occurenceDateTime?.toString() ?? '',
-          },
-        )
-        .toList();
+        final title = (obs.code.text ?? obs.code.coding?.first.display ?? '').toLowerCase();
 
-    List<Map<String, String>> procList = procedures
-        .map(
-          (p) => {
-            'name':
-                p.code?.text ??
-                p.code?.coding?.first.display ??
-                'Unknown Procedure',
-            'time': p.occurrenceDateTime?.toString() ?? '',
-          },
-        )
-        .toList();
+        String key;
+        if (title.contains('airway')) {
+          key = 'a';
+        } else if (title.contains('breathing')) {
+          key = 'b';
+        } else if (title.contains('circulation')) {
+          key = 'c';
+        } else if (title.contains('disability') || title.contains('gcs') || title.contains('pupil')) {
+          key = 'd';
+        } else if (title.contains('exposure') || title.contains('environ') || title.contains('temp')) {
+          key = 'e';
+        } else if (title.contains('neuro')) {
+          // In some apps, a 5th "Neurological" section is used for Exposure data
+          if (i == 4) {
+            key = 'e';
+          } else {
+            key = 'd';
+          }
+        } else {
+          // Fallback to positional mapping
+          switch (i) {
+            case 0: key = 'a'; break;
+            case 1: key = 'b'; break;
+            case 2: key = 'c'; break;
+            case 3: key = 'd'; break;
+            case 4: key = 'e'; break;
+            default: continue;
+          }
+        }
 
-    // Equipment Used (Secondary Query for Observations with SNOMED 246336002)
-    List<Map<String, String>> equipmentList = [];
-    if (patient != null && patient.id != null) {
-      try {
-        // Fetch Observations with code 246336002 (Material Used) linked to this patient
-        // We limit to recent ones or rely on the fact they are "floating" for this patient
-        final equipBundle = await BackendService.getBundle(
-          '${BackendConfig.fhirBaseUrl.value}/Observation?patient=${patient.id}&code=246336002&_sort=-date&_count=50',
-        );
+        extractObsData(obs, sections[key]!);
 
-        if (equipBundle.entry != null) {
-          for (var entry in equipBundle.entry!) {
-            if (entry.resource is r5.Observation) {
-              final obs = entry.resource as r5.Observation;
-              // Attempt to extract Device Name
-              // App puts device ref in 'device' (R4/R5) or 'focus'? App uses DeviceUsage class mapping to Observation.
-              // If mapped to Observation, 'device' field might be used.
-              String name = 'Unknown Item';
-              String amount = '1';
-
-              // Try to find name in device display or code text
-              if (obs.device != null) {
-                name =
-                    obs.device!.display ??
-                    'Device ${obs.device!.reference?.split("/").last}';
-                // If display is empty, we might need to fetch the device, but let's hope it's contained or display is set
-              } else if (obs.focus != null && obs.focus!.isNotEmpty) {
-                name = obs.focus!.first.display ?? 'Item';
-              } else {
-                // Fallback: check text text?
-                name = obs.code.text ?? 'Equipment';
+        // Link procedures that are "partOf" this observation root
+        if (obs.partOf != null) {
+          for (var partRef in obs.partOf!) {
+            if (partRef.reference?.contains('Procedure') ?? false) {
+              final proc = findProc(partRef.reference);
+              if (proc != null) {
+                final pTitle = proc.code?.text ?? proc.code?.coding?.first.display ?? 'Procedure';
+                sections[key]![pTitle] = 'Performed';
               }
-
-              // Amount: App puts it in timingTiming.repeat.count -> effectiveTiming.repeat.count in Observation
-              // Or valueQuantity
-              if (obs.effectiveTiming?.repeat?.count != null) {
-                amount =
-                    obs.effectiveTiming!.repeat!.count!.value?.toString() ??
-                    '1';
-              } else if (obs.valueQuantity != null) {
-                amount = obs.valueQuantity!.value?.toString() ?? '1';
-              } else if (obs.valueInteger != null) {
-                amount = obs.valueInteger.toString();
-              }
-
-              equipmentList.add({
-                'name': name,
-                'quantity':
-                    amount, // Changed 'amount' to 'quantity' to match PcrView
-              });
             }
           }
         }
-      } catch (e) {
-        debugPrint('Error fetching equipment: $e');
+      }
+    }
+
+    // Equipment Synthesis (Phase 2: Batch fetch Devices in Parallel)
+    List<Map<String, String>> equipmentList = [];
+    Map<String, String> deviceNames = {};
+    for (var dev in catalogDevices) {
+      if (dev.id != null) {
+        String devName = 'Device';
+        final devJson = dev.toJson();
+        // R5 style: name[0].value
+        if (devJson['name'] != null && devJson['name'] is List && devJson['name'].isNotEmpty) {
+          devName = devJson['name'][0]['value'] ?? 'Device';
+        }
+        // R4 style / Fallback: deviceName[0].name
+        else if (devJson['deviceName'] != null && devJson['deviceName'] is List && devJson['deviceName'].isNotEmpty) {
+          devName = devJson['deviceName'][0]['name'] ?? 'Device';
+        }
+        // Fallback: type.text
+        else if (dev.type != null && dev.type!.isNotEmpty) {
+          devName = dev.type!.first.text ?? dev.type!.first.coding?.first.display ?? 'Device';
+        }
+        deviceNames[dev.id!.toString()] = devName;
+      }
+    }
+
+    // Process Meds (async Medication lookup if needed)
+    List<Map<String, String>> medList = [];
+    for (var m in meds) {
+      String name = 'Unknown Drug';
+      if (m.medication.concept != null) {
+        name = m.medication.concept!.text ?? m.medication.concept!.coding?.first.display ?? 'Unknown Drug';
+      } else {
+        final medJson = m.medication.toJson();
+        String? medId;
+        final medRoot = medJson['reference'];
+        if (medRoot != null && medRoot['reference'] != null) {
+          final refObj = medRoot['reference'];
+          if (refObj is Map && refObj['reference'] != null) {
+            medId = refObj['reference'].toString().split('/').last;
+          } else if (refObj is String) {
+            medId = refObj.split('/').last;
+          }
+        }
+        if (medId != null) {
+          try {
+            final resJson = await BackendService.getResource('Medication', medId);
+            if (resJson != null) {
+              final coding = resJson['code']?['coding'];
+              if (coding is List && coding.isNotEmpty) {
+                name = coding[0]['display'] ?? name;
+              }
+            }
+          } catch (_) {}
+        }
+        if (name == 'Unknown Drug' && m.medication.reference?.display != null) {
+          name = m.medication.reference!.display!;
+        }
+      }
+      if (name == 'Unknown Drug' && m.text?.div != null) {
+        final plainText = m.text!.div.toString().replaceAll(RegExp(r'<[^>]*>'), '').replaceAll('&nbsp;', ' ').trim();
+        if (plainText.isNotEmpty) name = plainText;
+      }
+      medList.add({
+        'name': name,
+        'dose': m.dosage?.dose?.value?.toString() ?? '',
+        'route': m.dosage?.route?.text ?? m.dosage?.route?.coding?.first.display ?? '',
+        'time': m.occurenceDateTime?.toString() ?? '',
+      });
+
+      // Extract devices from MedicationAdministration (e.g. syringes for Adrenaline)
+      final mJson = m.toJson();
+      if (mJson['device'] != null && mJson['device'] is List) {
+        for (var d in mJson['device']) {
+          String? devId;
+          final devRef = d['reference'];
+          if (devRef != null && devRef['reference'] != null) {
+            devId = devRef['reference'].toString().split('/').last;
+          }
+          if (devId != null) {
+             equipmentList.add({'name': deviceNames[devId] ?? (devId == '516' ? 'Syringe/Injection Device' : 'Item $devId'), 'quantity': '1'});
+          }
+        }
+      }
+    }
+
+    List<Map<String, String>> procList = procedures.map((p) {
+      String name = 'Unknown Procedure';
+      if (p.code != null) name = p.code!.text ?? p.code!.coding?.first.display ?? name;
+      if (name == 'Unknown Procedure' && p.text?.div != null) {
+        final plainText = p.text!.div.toString().replaceAll(RegExp(r'<[^>]*>'), '').replaceAll('&nbsp;', ' ').trim();
+        if (plainText.isNotEmpty) name = plainText;
+      }
+      return {'name': name, 'time': p.occurrenceDateTime?.toString() ?? ''};
+    }).toList();
+    for (var proc in procedures) {
+      if (proc.focalDevice != null) {
+        for (var fd in proc.focalDevice!) {
+          final manipulated = fd.manipulated;
+          final ref = manipulated.reference;
+          if (ref != null) {
+            final devId = ref.split('/').last;
+            final name = manipulated.display ?? deviceNames[devId] ?? devId;
+            if (!equipmentList.any((e) => e['name'] == name)) {
+              equipmentList.add({'name': name, 'quantity': '1'});
+            }
+          }
+        }
+      }
+    }
+
+    // Devices from DeviceUsage (Resolved from pre-fetched Catalog)
+    if (allUsageEntries.isNotEmpty) {
+      for (var entry in allUsageEntries) {
+        if (entry.resource is r5.DeviceUsage) {
+          final usage = entry.resource as r5.DeviceUsage;
+          String name = 'Unknown Item';
+          final usageJson = usage.toJson();
+          String? deviceId;
+          final devRoot = usageJson['device'];
+          if (devRoot != null && devRoot['reference'] != null) {
+            final refObj = devRoot['reference'];
+            if (refObj is Map && refObj['reference'] != null) {
+              deviceId = refObj['reference'].toString().split('/').last;
+            } else if (refObj is String) {
+              deviceId = refObj.split('/').last;
+            }
+          }
+          if (deviceId != null) {
+            name = deviceNames[deviceId] ?? 'Item $deviceId';
+          } else if (usage.device.reference?.display != null) {
+            name = usage.device.reference!.display!;
+          }
+
+          if (!equipmentList.any((e) => e['name'] == name)) {
+            equipmentList.add({'name': name, 'quantity': '1'});
+          }
+        }
+      }
+    }
+
+    // Equipment from Observations
+    for (var obs in equipObs) {
+      String name = obs.device?.display ?? (obs.focus?.isNotEmpty == true ? obs.focus!.first.display ?? 'Item' : obs.code.text ?? 'Equipment');
+      String amount = obs.effectiveTiming?.repeat?.count?.value?.toString() ?? obs.valueQuantity?.value?.toString() ?? obs.valueInteger?.toString() ?? '1';
+      if (!equipmentList.any((e) => e['name'] == name)) {
+        equipmentList.add({'name': name, 'quantity': amount});
       }
     }
 
@@ -467,8 +743,6 @@ class PcrService {
   /// Fetches the most recent reports with optimized detail fetching.
   Future<List<Map<String, String>>> getRecentReports(int count) async {
     try {
-      // Fetch recent reports with included resources for efficiency
-      // We include Patient and Performer (Practitioner)
       String url =
           '${BackendConfig.fhirBaseUrl.value}/${GeneralConstants.diagnosticReportName}?_sort=-date&_count=$count&_include=DiagnosticReport:patient&_include=DiagnosticReport:performer';
 
@@ -498,17 +772,24 @@ class PcrService {
       List<Map<String, String>> results = [];
       for (var report in reports) {
         // 1. Patient Name + ID
+        // 1. Patient Name + ID
         String patientText = 'Unknown';
         if (report.subject != null) {
           String id = report.subject!.reference?.split('/').last ?? '';
-          // Try to find in included resources
           if (patients.containsKey(id)) {
             final p = patients[id]!;
-            final name =
-                p.name?.first.text ?? p.name?.first.family ?? 'Unknown';
-            patientText = '$name ($id)';
+            // Temporary helper for batch resolution
+            String pName(List<r5.HumanName>? n) {
+              if (n == null || n.isEmpty) return 'Unknown';
+              final first = n.first;
+              if (first.text != null && first.text!.isNotEmpty) return first.text!;
+              final fam = first.family ?? '';
+              final giv = first.given?.join(' ') ?? '';
+              final comb = [giv, fam].where((s) => s.isNotEmpty).join(' ');
+              return comb.isNotEmpty ? comb : 'Unknown';
+            }
+            patientText = '${pName(p.name)} ($id)';
           } else {
-            // Fallback to display or reference
             patientText = report.subject!.display ?? 'ID: $id';
           }
         }
@@ -521,8 +802,16 @@ class PcrService {
 
           if (practitioners.containsKey(id)) {
             final p = practitioners[id]!;
-            final name = p.name?.first.text ?? p.name?.first.family ?? 'Driver';
-            driverText = '$name ($id)';
+            String dName(List<r5.HumanName>? n) {
+              if (n == null || n.isEmpty) return 'Driver';
+              final first = n.first;
+              if (first.text != null && first.text!.isNotEmpty) return first.text!;
+              final fam = first.family ?? '';
+              final giv = first.given?.join(' ') ?? '';
+              final comb = [giv, fam].where((s) => s.isNotEmpty).join(' ');
+              return comb.isNotEmpty ? comb : 'Driver';
+            }
+            driverText = '${dName(p.name)} ($id)';
           } else {
             driverText = perfRef.display ?? 'ID: $id';
           }
@@ -535,15 +824,11 @@ class PcrService {
           if (ref != null) {
             final vehicleId = ref.split('/').last;
             try {
-              // Assuming it's a Location resource based on typical setup.
-              // If it returns 404, we'll fall back to ID.
-              // We can use the generic 'read' if we knew the type, but let's assume Location and try.
               final vehicleJson = await BackendService.getResource(
                 GeneralConstants.locationResourceName,
                 vehicleId,
-              ); // Or Device?
+              );
               if (vehicleJson != null) {
-                // Check if it's a Location
                 if (vehicleJson['resourceType'] == 'Location') {
                   vehicleText =
                       vehicleJson['name'] ??
@@ -554,7 +839,6 @@ class PcrService {
                       vehicleJson['deviceName']?.first['name'] ?? vehicleId;
                 }
               } else {
-                // Failed to fetch, use ID
                 vehicleText = 'ID: $vehicleId';
               }
             } catch (e) {

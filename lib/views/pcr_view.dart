@@ -246,6 +246,8 @@ class _PCRViewState extends State<PCRView> {
           _buildInfoItem('Start Time', _formatDateTime(encounter['startTime'])),
           if (encounter['endTime'] != null)
             _buildInfoItem('End Time', _formatDateTime(encounter['endTime'])),
+          _buildInfoItem('Origin', encounter['origin'] ?? 'N/A'),
+          _buildInfoItem('Destination', encounter['destination'] ?? 'N/A'),
           _buildInfoItem('Vehicle', encounter['vehicle'] ?? 'N/A'),
           _buildInfoItem('License Plate', encounter['licensePlate'] ?? 'N/A'),
           _buildInfoItem('Driver', encounter['driver'] ?? 'N/A'),
@@ -266,14 +268,15 @@ class _PCRViewState extends State<PCRView> {
           Wrap(
             spacing: 24,
             runSpacing: 16,
-            children: data.entries
-                .where((entry) => entry.key != 'furtherEvaluation')
-                .map(
-                  (entry) => _buildInfoItem(
-                    _formatKey(entry.key),
-                    entry.value.toString(),
-                  ),
-                )
+            children: data.entries.where((entry) {
+              if (entry.key == 'furtherEvaluation') return false;
+              final val = entry.value.toString().toLowerCase();
+              if (val == 'false' || val == '0' || val == '0.0') return false;
+              return true;
+            }).map((entry) => _buildInfoItem(
+                      _formatKey(entry.key),
+                      entry.value.toString(),
+                    ))
                 .toList(),
           ),
           if (data['furtherEvaluation'] != null) ...[

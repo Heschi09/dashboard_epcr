@@ -6,14 +6,12 @@ import '../widgets/simple_table.dart';
 import '../widgets/stat_chip.dart';
 import '../widgets/quick_action_chip.dart';
 
-class DashboardView extends StatelessWidget {
+class DashboardView extends StatefulWidget {
   const DashboardView({
     super.key,
     required this.transports,
     required this.openOrders,
     required this.closedOrders,
-    required this.onEditOpenOrder,
-    required this.onAcceptOpenOrder,
     required this.onTransportsTap,
     required this.onOpenTap,
     required this.onClosedTap,
@@ -30,8 +28,6 @@ class DashboardView extends StatelessWidget {
   final List<Map<String, String>> transports;
   final List<Map<String, String>> openOrders;
   final List<Map<String, String>> closedOrders;
-  final ValueChanged<int> onEditOpenOrder;
-  final ValueChanged<int> onAcceptOpenOrder;
   final VoidCallback onTransportsTap;
   final VoidCallback onOpenTap;
   final VoidCallback onClosedTap;
@@ -46,6 +42,19 @@ class DashboardView extends StatelessWidget {
   final List<Map<String, dynamic>> transportViewData;
 
   @override
+  State<DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends State<DashboardView> {
+  final ScrollController _transportScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _transportScrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -58,22 +67,23 @@ class DashboardView extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 3, child: _buildSummaryCard(context)),
+                  Expanded(
+                    flex: 3,
+                    child: _buildSummaryCard(context),
+                  ),
                   const SizedBox(width: 24),
-                  Expanded(flex: 2, child: _buildTransportHistoryCard()),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      children: [
+                        _buildTransportsCard(context),
+                        const SizedBox(height: 24),
+                        _buildTransportHistoryCard(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _buildTransportsCard(context)),
-                  const SizedBox(width: 24),
-                  Expanded(child: _buildOpenOrdersCard(context)),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _buildClosedOrdersCard(context),
             ],
           ),
         ),
@@ -94,18 +104,18 @@ class DashboardView extends StatelessWidget {
             children: [
               StatChip(
                 label: 'Transports',
-                value: transports.length.toString(),
-                onTap: onTransportsTap,
+                value: widget.transports.length.toString(),
+                onTap: widget.onTransportsTap,
               ),
               StatChip(
                 label: 'Open',
-                value: openOrdersCount.toString(),
-                onTap: onOpenTap,
+                value: widget.openOrdersCount.toString(),
+                onTap: widget.onOpenTap,
               ),
               StatChip(
                 label: 'Closed',
-                value: '${closedOrders.length}',
-                onTap: onClosedTap,
+                value: '${widget.closedOrders.length}',
+                onTap: widget.onClosedTap,
               ),
             ],
           ),
@@ -125,7 +135,7 @@ class DashboardView extends StatelessWidget {
               3: FlexColumnWidth(1),
               4: FlexColumnWidth(1),
             },
-            rows: newOrders
+            rows: widget.newOrders
                 .map(
                   (item) => [
                     item['id']!,
@@ -150,22 +160,22 @@ class DashboardView extends StatelessWidget {
               QuickActionChip(
                 icon: Icons.person_add_alt,
                 label: 'New crew member',
-                onTap: onNewCrewTap,
+                onTap: widget.onNewCrewTap,
               ),
               QuickActionChip(
                 icon: Icons.local_shipping_outlined,
                 label: 'Register new vehicle',
-                onTap: onNewVehicleTap,
+                onTap: widget.onNewVehicleTap,
               ),
               QuickActionChip(
                 icon: Icons.medical_services_outlined,
                 label: 'Register equipment',
-                onTap: onNewEquipmentTap,
+                onTap: widget.onNewEquipmentTap,
               ),
               QuickActionChip(
                 icon: Icons.assignment_add,
                 label: 'Create new order',
-                onTap: onNewOrderTap,
+                onTap: widget.onNewOrderTap,
               ),
             ],
           ),
@@ -181,7 +191,7 @@ class DashboardView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (transports.isEmpty)
+          if (widget.transports.isEmpty)
             const Padding(
               padding: EdgeInsets.all(16.0),
               child: Text(
@@ -193,11 +203,14 @@ class DashboardView extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 300),
               child: Scrollbar(
+                controller: _transportScrollController,
+                thumbVisibility: true,
                 child: ListView.builder(
+                  controller: _transportScrollController,
                   shrinkWrap: true,
-                  itemCount: transports.length,
+                  itemCount: widget.transports.length,
                   itemBuilder: (context, index) {
-                    final item = transports[index];
+                    final item = widget.transports[index];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
@@ -211,8 +224,20 @@ class DashboardView extends StatelessWidget {
                               : 'Transport: ${item['id'] ?? 'Unknown'}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        subtitle: Text(
-                          '${item['date']} • ${item['destination']} • ${item['time']}',
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Patient: ${item['patient']}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              '${item['date']} • ${item['destination']} • ${item['time']}',
+                            ),
+                          ],
                         ),
                         trailing: Chip(
                           label: Text(
@@ -224,8 +249,8 @@ class DashboardView extends StatelessWidget {
                         onTap: () {
                           if (item['pcrId'] != null &&
                               item['pcrId']!.isNotEmpty &&
-                              onTransportPcrTap != null) {
-                            onTransportPcrTap!(item['pcrId']!);
+                              widget.onTransportPcrTap != null) {
+                            widget.onTransportPcrTap!(item['pcrId']!);
                           }
                         },
                       ),
@@ -239,298 +264,69 @@ class DashboardView extends StatelessWidget {
     );
   }
 
-  Widget _buildOpenOrdersCard(BuildContext context) {
-    return DashboardCard(
-      title: 'Open Orders',
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (openOrders.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'No open orders',
-                style: TextStyle(color: Color(0xFF8B909A)),
-              ),
-            )
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 300),
-              child: Scrollbar(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: openOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = openOrders[index];
-                    final priority = order['priority']?.toUpperCase() ?? '';
-                    final isUrgent = priority == 'STAT' || priority == 'URGENT';
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isUrgent
-                              ? Colors.red.withValues(alpha: 0.2)
-                              : Colors.blue.withValues(alpha: 0.1),
-                          child: Icon(
-                            isUrgent ? Icons.warning : Icons.assignment,
-                            color: isUrgent ? Colors.red : Colors.blue,
-                          ),
-                        ),
-                        title: Text(
-                          '${order['title']} ${priority.isNotEmpty ? "($priority)" : ""}',
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (order['patient'] != null &&
-                                order['patient'] != 'Unknown')
-                              Text(
-                                'Patient: ${order['patient']}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            Text('${order['location']} • ${order['time']}'),
-                            if (order['licensePlate'] != null &&
-                                order['licensePlate']!.isNotEmpty)
-                              Text(
-                                'License Plate: ${order['licensePlate']}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                          ],
-                        ),
-                        isThreeLine: true,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined, size: 18),
-                              onPressed: () => onEditOpenOrder(index),
-                              tooltip: 'Edit',
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.check_circle_outline,
-                                size: 18,
-                              ),
-                              onPressed: () => onAcceptOpenOrder(index),
-                              tooltip: 'Complete',
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildClosedOrdersCard(BuildContext context) {
-    return DashboardCard(
-      title: 'Closed Orders',
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (closedOrders.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'No closed orders',
-                style: TextStyle(color: Color(0xFF8B909A)),
-              ),
-            )
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 300),
-              child: Scrollbar(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: closedOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = closedOrders[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                        ),
-                        title: Text(order['title'] ?? ''),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (order['patient'] != null &&
-                                order['patient'] != 'Unknown')
-                              Text('Patient: ${order['patient']}'),
-                            Text('${order['location']} • ${order['time']}'),
-                          ],
-                        ),
-                        isThreeLine: true,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTransportHistoryCard() {
-    final data = transportViewData;
+    final data = widget.transportViewData;
     final hasData = data.isNotEmpty;
     double maxY = 10;
     if (hasData) {
-      final maxDur = data.fold<double>(0, (m, t) => math.max(m, t['duration']));
+      final maxDur = data.fold<double>(
+        0,
+        (m, t) => math.max(m, (t['duration'] as num).toDouble()),
+      );
       maxY = (maxDur * 1.2).clamp(10, 9999).toDouble();
     }
 
     return DashboardCard(
       title: 'Transport Duration History (Last ${data.length})',
       width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 250,
-            padding: const EdgeInsets.only(top: 16, right: 16, bottom: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFDFDFD),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE3E5EA)),
-            ),
-            child: !hasData
-                ? const Center(
-                    child: Text(
-                      'No transport history with valid duration',
-                      style: TextStyle(color: Color(0xFF8B909A)),
-                    ),
-                  )
+      child: SizedBox(
+        height: 200,
+        child:
+            !hasData
+                ? const Center(child: Text('Insufficient data for history'))
                 : BarChart(
-                    BarChartData(
-                      maxY: maxY,
-                      minY: 0,
-                      barGroups: List.generate(data.length, (index) {
-                        final item = data[index];
-                        final dur = item['duration'] as double;
-                        return BarChartGroupData(
-                          x: index,
-                          barRods: [
-                            BarChartRodData(
-                              toY: dur,
-                              color: Colors.blueAccent,
-                              width: 12,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
-                              ),
-                            ),
-                          ],
-                        );
-                      }),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            getTitlesWidget: (value, meta) {
-                              final index = value.toInt();
-                              if (index < 0 || index >= data.length) {
-                                return const SizedBox.shrink();
-                              }
-
-                              final item = data[index];
-                              final dateStr = item['date'] as String;
-                              // "DD.MM. HH:mm" -> get "DD.MM"
-                              final shortDate = dateStr.length > 5
-                                  ? dateStr.substring(0, 5)
-                                  : dateStr;
-
-                              return SideTitleWidget(
-                                meta: meta,
-                                space: 4,
-                                child: Text(
-                                  shortDate,
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    color: Color(0xFF7589A2),
-                                  ),
-                                ),
-                              );
-                            },
-                            reservedSize: 20,
-                          ),
-                        ),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 32,
-                            getTitlesWidget: (value, meta) {
-                              if (value == 0) return const SizedBox.shrink();
-                              return Text(
-                                '${value.toInt()}m',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF7589A2),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      borderData: FlBorderData(show: false),
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        horizontalInterval: maxY / 5,
-                        getDrawingHorizontalLine: (value) => const FlLine(
-                          color: Color(0xFFE3E5EA),
-                          strokeWidth: 1,
-                        ),
-                      ),
-                      barTouchData: BarTouchData(
-                        enabled: true,
-                        touchTooltipData: BarTouchTooltipData(
-                          getTooltipColor: (group) => Colors.blueGrey,
-                          tooltipPadding: const EdgeInsets.all(8),
-                          tooltipMargin: 8,
-                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            final index = group.x.toInt();
-                            if (index < 0 || index >= data.length) return null;
-                            final item = data[index];
-                            return BarTooltipItem(
-                              '${item['id']}\n'
-                              '${item['date']}\n'
-                              '${rod.toY.round()} min',
-                              const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            );
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: maxY,
+                    barTouchData: BarTouchData(enabled: false),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            return const Text('', style: TextStyle(fontSize: 10));
                           },
                         ),
                       ),
+                      leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                     ),
+                    gridData: const FlGridData(show: false),
+                    borderData: FlBorderData(show: false),
+                    barGroups:
+                        data.asMap().entries.map((entry) {
+                          return BarChartGroupData(
+                            x: entry.key,
+                            barRods: [
+                              BarChartRodData(
+                                toY: (entry.value['duration'] as num).toDouble(),
+                                color: Colors.blueAccent,
+                                width: 16,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                   ),
-          ),
-        ],
+                ),
       ),
     );
   }
